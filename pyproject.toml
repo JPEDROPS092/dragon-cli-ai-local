@@ -8,6 +8,8 @@ version = "0.2.0"
 description = "CLI to chat with local GGUF LLMs, with MCP tool-calling and SQLite conversation history."
 readme = "README.md"
 requires-python = ">=3.10"
+license = "MIT"
+authors = [{ name = "JPEDROPS092" }]
 dependencies = [
     "huggingface_hub",
     "psutil",
@@ -26,6 +28,11 @@ dependencies = [
 # `dragon-cli-install-llm` (auto-detects OS, uses prebuilt CPU wheels), or via
 # this extra if you already have a working compiler: pip install -e ".[llm]"
 llm = ["llama-cpp-python"]
+
+[project.urls]
+Homepage = "https://jpedrops092.github.io/dragon-cli-ai-local/"
+Repository = "https://github.com/JPEDROPS092/dragon-cli-ai-local"
+Issues = "https://github.com/JPEDROPS092/dragon-cli-ai-local/issues"
 
 [project.scripts]
 dragon-cli = "dragon_cli.cli:main"

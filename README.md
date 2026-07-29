@@ -1,5 +1,13 @@
 # Dragon CLI
 
+![1785346956957](image/README/1785346956957.png)
+
+[![License: MIT](https://img.shields.io/github/license/JPEDROPS092/dragon-cli-ai-local)](LICENSE)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
+[![Docs](<https://img.shields.io/badge/docs-GitHub%20Pages-7fe0d1>)](https://jpedrops092.github.io/dragon-cli-ai-local/)
+[![GitHub stars](https://img.shields.io/github/stars/JPEDROPS092/dragon-cli-ai-local?style=social)](https://github.com/JPEDROPS092/dragon-cli-ai-local/stargazers)
+[![GitHub issues](https://img.shields.io/github/issues/JPEDROPS092/dragon-cli-ai-local)](https://github.com/JPEDROPS092/dragon-cli-ai-local/issues)
+
 Chat with local GGUF LLMs (100% CPU, via `llama-cpp-python`), with optional
 MCP (Model Context Protocol) tool-calling and a SQLite-backed conversation
 history.
@@ -74,21 +82,21 @@ explicitly if you want it reachable from other devices on your network.
 
 ## In-chat commands
 
-| Command | Description |
-|---|---|
-| `/help` | show available commands |
-| `/models` | list the model catalog |
-| `/tools` | list connected MCP tools |
-| `/mcp` | show MCP server connection status |
-| `/clear` | clear the current in-memory history |
-| `/new [title]` | start a new conversation |
-| `/list` | list saved conversations |
-| `/resume <id>` | resume a saved conversation |
-| `/rename <id> <title>` | rename a saved conversation |
-| `/delete <id>` | delete a saved conversation |
-| `/search <text>` | search saved messages for text |
-| `/export <id> [md\|json]` | export a conversation to a file |
-| `/exit`, `/quit` | end the program |
+| Command                    | Description                         |
+| -------------------------- | ----------------------------------- |
+| `/help`                  | show available commands             |
+| `/models`                | list the model catalog              |
+| `/tools`                 | list connected MCP tools            |
+| `/mcp`                   | show MCP server connection status   |
+| `/clear`                 | clear the current in-memory history |
+| `/new [title]`           | start a new conversation            |
+| `/list`                  | list saved conversations            |
+| `/resume <id>`           | resume a saved conversation         |
+| `/rename <id> <title>`   | rename a saved conversation         |
+| `/delete <id>`           | delete a saved conversation         |
+| `/search <text>`         | search saved messages for text      |
+| `/export <id> [md\|json]` | export a conversation to a file     |
+| `/exit`, `/quit`       | end the program                     |
 
 Every message is autosaved to SQLite (`dragon_cli.db` by default) as soon as
 it's sent, so nothing is lost if the process crashes.
