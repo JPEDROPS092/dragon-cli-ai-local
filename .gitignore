@@ -20,7 +20,7 @@ ENV/
 .ruff_cache/
 
 # Dragon CLI runtime data — local to each machine, not meant to be committed
-models/
+
 *.db
 *.db-journal
 mcp_servers.json
