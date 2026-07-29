@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dragon-cli"
+version = "0.2.0"
+description = "CLI to chat with local GGUF LLMs, with MCP tool-calling and SQLite conversation history."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "huggingface_hub",
+    "psutil",
+    "mcp",
+    "fastapi",
+    "starlette",
+    "uvicorn",
+    "fastapi-sse-starlette",
+    "fastapi"
+]
+
+[project.optional-dependencies]
+# llama-cpp-python ships as C++ source on PyPI for many platforms, so pulling
+# it in as a hard dependency makes `pip install -e .` try to compile it and
+# fail without a C/C++ toolchain. Install it separately with
+# `dragon-cli-install-llm` (auto-detects OS, uses prebuilt CPU wheels), or via
+# this extra if you already have a working compiler: pip install -e ".[llm]"
+llm = ["llama-cpp-python"]
+
+[project.scripts]
+dragon-cli = "dragon_cli.cli:main"
+dragon-cli-install-llm = "dragon_cli.setup_llm:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
