@@ -13,15 +13,22 @@ ReDoc at /redoc, raw schema at /openapi.json.
 import asyncio
 import json
 import threading
+from pathlib import Path
 
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, Response, StreamingResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel, Field
 from starlette.concurrency import run_in_threadpool
 
 from .config import C_CYAN, C_GREEN, C_RESET, C_YELLOW
-from .web import FAVICON_SVG, render_index
+from .web import FAVICON_SVG
+
+BASE_DIR = Path(__file__).resolve().parent
+TEMPLATES = Jinja2Templates(directory=BASE_DIR / "templates")
+IMAGE_DIR = BASE_DIR.parents[2] / "image"
 
 # llama.cpp inference is not safe to run concurrently from multiple threads,
 # so every request (streaming or not) serializes on this lock.
@@ -75,9 +82,15 @@ def create_app(llm, model_name: str) -> FastAPI:
     app.state.llm = llm
     app.state.model_name = model_name
 
+    app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
+
     @app.get("/", response_class=HTMLResponse, include_in_schema=False)
     async def index(request: Request) -> HTMLResponse:
-        return HTMLResponse(render_index(model_name, str(request.base_url)))
+        return TEMPLATES.TemplateResponse("index.html", {
+            "request": request,
+            "model_name": model_name,
+            "base_url": str(request.base_url).rstrip("/"),
+        })
 
     @app.get("/favicon.ico", include_in_schema=False)
     async def favicon() -> Response:
