@@ -9,10 +9,13 @@ Features:
   * Tool-calling: the model can call tools exposed by MCP servers
   * SQLite-backed conversation history: list/new/resume/rename/delete/search/export
   * --serve: OpenAI-compatible HTTP endpoint for the loaded model
+  * --profile: Show hardware profile
+  * --recommend: Show model recommendations
+  * --auto: Automatically select best model for your hardware
 
 Install (in your venv):
     pip install -e .
-    dragon-cli-install-llm   # detects your OS, installs a prebuilt llama-cpp-python wheel
+    dragon-cli-install-llm   (detects your OS, installs a prebuilt llama-cpp-python wheel)
 
 Usage:
     dragon-cli                       # model menu + chat
@@ -22,6 +25,9 @@ Usage:
     dragon-cli --resume 3            # resume saved conversation #3
     dragon-cli --list-conversations  # list saved conversations and exit
     dragon-cli --serve --port 8000   # serve the model over HTTP instead of chatting
+    dragon-cli --profile             # show hardware profile
+    dragon-cli --recommend           # show model recommendations
+    dragon-cli --auto                # auto-select best model
 
 In-chat commands:
     /help    /models   /tools    /mcp     /clear
@@ -53,6 +59,14 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--port", type=int, default=8000, help="port for --serve (default: 8000)")
     parser.add_argument("--host", default="127.0.0.1",
                          help="bind address for --serve (default: 127.0.0.1, localhost only)")
+    parser.add_argument("--profile", action="store_true",
+                         help="show hardware profile and exit")
+    parser.add_argument("--recommend", action="store_true",
+                         help="show model recommendations for your hardware and exit")
+    parser.add_argument("--priority", choices=["speed", "quality", "balanced", "memory"],
+                         default="balanced", help="optimization priority for --recommend or --auto")
+    parser.add_argument("--auto", action="store_true",
+                         help="automatically select the best model for your hardware")
     return parser
 
 
@@ -64,6 +78,17 @@ def main() -> None:
 
     print(C_CYAN + BANNER + C_RESET)
     print(C_YELLOW + SUBTITLE + C_RESET + "\n")
+
+    # Handle new flags before banner display
+    if args.profile:
+        from .hardware import print_hardware_profile
+        print_hardware_profile()
+        return
+
+    if args.recommend:
+        from .recommendation import recommend_model_for_hardware
+        recommend_model_for_hardware(priority=args.priority, show_all=True)
+        return
 
     if args.list:
         list_catalog()

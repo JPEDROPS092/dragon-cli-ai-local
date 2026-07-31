@@ -1,35 +1,24 @@
-# Python
+```
+# Compiled Python files
+*.pyc
 __pycache__/
-*.py[cod]
-*.egg-info/
-.eggs/
-build/
-dist/
-*.egg
 
-# Virtual environments
-venv/
+# Dependencies
 .venv/
-env/
-ENV/
+venv/
 .env
+.env.local
+*.env.*
 
-# Tooling caches
-.mypy_cache/
-.pytest_cache/
-.ruff_cache/
+# Logs and temp files
+*.log
+*.tmp
 
-# Dragon CLI runtime data — local to each machine, not meant to be committed
-
-*.db
-*.db-journal
-mcp_servers.json
-conversation_*.md
-conversation_*.json
-
-# Editors / OS
+# Editors
 .vscode/
 .idea/
-.DS_Store
-Thumbs.db
-Desktop.ini
+
+# Build/dist directories
+dist/
+build/
+```
