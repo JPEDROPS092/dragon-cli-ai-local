@@ -10,6 +10,23 @@ from .storage import ConversationStore
 
 
 def choose_model(args) -> dict | None:
+    # Handle --auto flag for automatic model selection
+    if getattr(args, 'auto', False):
+        from .recommendation import ModelRecommender
+        recommender = ModelRecommender()
+        best_model = recommender.recommend_best(priority=getattr(args, 'priority', 'balanced'))
+        
+        if best_model:
+            print(f"\n{C_RESET}Auto-selected model based on your hardware:")
+            print(f"  → {best_model['name']}")
+            reason = recommender.get_recommendation_reason(best_model)
+            print(f"  {C_DIM}Why: {reason}{C_RESET}\n")
+            return best_model
+        else:
+            print(f"{C_RED}[error]{C_RESET} No compatible models found for your hardware.")
+            # Fall back to manual selection
+            pass
+    
     list_catalog()
     if args.model:
         choice = args.model
