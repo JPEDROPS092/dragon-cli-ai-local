@@ -17,7 +17,6 @@ dependencies = [
     "fastapi",
     "starlette",
     "uvicorn",
-    "fastapi-sse-starlette",
     "fastapi"
 ]
 
