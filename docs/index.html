@@ -127,6 +127,38 @@ dragon-cli --serve --port 8000   # serve the model over HTTP instead</code></pre
     </table>
   </section>
 
+  <section>
+    <h2>New: Intelligent Model Orchestrator</h2>
+    <p>Dragon CLI now includes advanced hardware detection and automatic model recommendation features:</p>
+    <div class="grid">
+      <div class="card">
+        <h3>🔍 Hardware Detection</h3>
+        <p>Automatically detects CPU, RAM, GPU (NVIDIA/AMD/Apple Silicon), and disk space to build an execution profile.</p>
+      </div>
+      <div class="card">
+        <h3>🎯 Smart Recommendations</h3>
+        <p>Recommends the best GGUF models for your hardware based on RAM, VRAM, and performance priorities (speed, quality, memory).</p>
+      </div>
+      <div class="card">
+        <h3>⚡ GPU Acceleration</h3>
+        <p>The installer now auto-detects NVIDIA CUDA, AMD ROCm, or Apple Metal and installs optimized llama-cpp-python with GPU support.</p>
+      </div>
+      <div class="card">
+        <h3>🤖 Auto-Selection</h3>
+        <p>Use <code>--auto</code> flag to automatically choose and run the best model for your system without manual selection.</p>
+      </div>
+    </div>
+    <h3 style="margin-top:1.5rem;font-size:0.98rem;color:#eef4fa;">New CLI Flags</h3>
+    <pre><code>dragon-cli --profile      # show complete hardware profile
+dragon-cli --recommend    # display recommended models for your machine
+dragon-cli --auto         # automatically select and run the best model
+dragon-cli --priority speed|quality|balanced|memory  # set recommendation priority</code></pre>
+    <h3 style="margin-top:1.5rem;font-size:0.98rem;color:#eef4fa;">Automatic GPU Installation</h3>
+    <pre><code>dragon-cli-install-llm    # now detects GPU and installs optimized version
+                          # Supports: NVIDIA CUDA, AMD ROCm, Apple Metal, or CPU fallback</code></pre>
+    <p>The installer will automatically detect your GPU and compile llama-cpp-python with the appropriate acceleration backend for maximum performance.</p>
+  </section>
+
   <footer>
     MIT licensed. Built by <a href="https://github.com/JPEDROPS092">JPEDROPS092</a>.
   </footer>
