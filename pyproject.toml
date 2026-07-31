@@ -24,8 +24,8 @@ dependencies = [
 # llama-cpp-python ships as C++ source on PyPI for many platforms, so pulling
 # it in as a hard dependency makes `pip install -e .` try to compile it and
 # fail without a C/C++ toolchain. Install it separately with
-# `dragon-cli-install-llm` (auto-detects OS, uses prebuilt CPU wheels), or via
-# this extra if you already have a working compiler: pip install -e ".[llm]"
+# `dragon-cli-install-llm` (auto-detects OS/GPU, uses optimal prebuilt wheels),
+# or via this extra if you already have a working compiler: pip install -e ".[llm]"
 llm = ["llama-cpp-python"]
 
 [project.urls]

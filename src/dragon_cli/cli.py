@@ -15,7 +15,7 @@ Features:
 
 Install (in your venv):
     pip install -e .
-    dragon-cli-install-llm   (detects your OS, installs a prebuilt llama-cpp-python wheel)
+    dragon-cli-install-llm   (detects your OS/GPU, installs optimal llama-cpp-python wheel)
 
 Usage:
     dragon-cli                       # model menu + chat
@@ -106,7 +106,7 @@ def main() -> None:
     if missing and not args.list_conversations:
         if "llama-cpp-python" in missing:
             print("Missing dependency: llama-cpp-python.")
-            print("Run: dragon-cli-install-llm   (detects your OS and installs a prebuilt CPU wheel)")
+            print("Run: dragon-cli-install-llm   (detects your OS/GPU and installs the optimal wheel)")
             missing.remove("llama-cpp-python")
         if missing:
             print(f"Install the remaining dependencies: pip install {' '.join(missing)}")
