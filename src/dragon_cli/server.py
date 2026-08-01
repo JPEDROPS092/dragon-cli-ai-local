@@ -86,8 +86,14 @@ def create_app(llm, model_name: str) -> FastAPI:
 
     @app.get("/", response_class=HTMLResponse, include_in_schema=False)
     async def index(request: Request) -> HTMLResponse:
-        return TEMPLATES.TemplateResponse("index.html", {
-            "request": request,
+        return TEMPLATES.TemplateResponse(request, "index.html", {
+            "model_name": model_name,
+            "base_url": str(request.base_url).rstrip("/"),
+        })
+
+    @app.get("/chat", response_class=HTMLResponse, include_in_schema=False)
+    async def chat(request: Request) -> HTMLResponse:
+        return TEMPLATES.TemplateResponse(request, "chat.html", {
             "model_name": model_name,
             "base_url": str(request.base_url).rstrip("/"),
         })
@@ -131,5 +137,8 @@ async def run_server(llm, model_name: str, host: str, port: int) -> None:
           f"{C_CYAN}http://{host}:{port}/v1{C_RESET}")
     print(f"{C_GREEN}[serve]{C_RESET} Interactive docs (Swagger UI): "
           f"{C_CYAN}http://{host}:{port}/docs{C_RESET}")
-    print(f"{C_YELLOW}[serve]{C_RESET} Model: {model_name}. Press Ctrl+C to stop.")
+    print(f"{C_GREEN}[serve]{C_RESET} Chat UI: "
+          f"{C_CYAN}http://{host}:{port}/chat{C_RESET}")
+    backend = getattr(llm, "exec_mode", "CPU")
+    print(f"{C_YELLOW}[serve]{C_RESET} Model: {model_name} on {backend}. Press Ctrl+C to stop.")
     await server.serve()

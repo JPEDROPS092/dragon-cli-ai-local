@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dragon CLI Chat UI</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.ico">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <img src="/static/dragon-icon.png" alt="Dragon CLI" class="brand-icon">
+        <div>
+          <h1>Dragon CLI</h1>
+          <p>Chat with your local model</p>
+        </div>
+      </div>
+      <div class="model-card">
+        <strong>Model:</strong>
+        <span>{{ model_name }}</span>
+      </div>
+      <div class="instructions">
+        <p>Type your message below and send it to chat with the local model.</p>
+        <p><a href="{{ base_url }}/">Back to home</a></p>
+      </div>
+    </aside>
+
+    <main class="chat-panel">
+      <header class="chat-header">
+        <div>
+          <h2>Dragon CLI Chat</h2>
+          <p>Servidor: {{ base_url }}</p>
+        </div>
+      </header>
+
+      <section id="messages" class="messages" aria-live="polite"></section>
+
+      <form id="chat-form" class="composer">
+        <textarea id="prompt" placeholder="Type your question here..." rows="3" required></textarea>
+        <div class="composer-actions">
+          <button type="submit">Send</button>
+          <label>
+            <input type="checkbox" id="stream" checked>
+            Streaming
+          </label>
+        </div>
+      </form>
+    </main>
+  </div>
+
+  <script>
+    const baseUrl = "{{ base_url }}";
+    const modelName = "{{ model_name }}";
+
+    const messagesEl = document.getElementById("messages");
+    const form = document.getElementById("chat-form");
+    const promptInput = document.getElementById("prompt");
+    const streamCheckbox = document.getElementById("stream");
+
+    function addMessage(role, text) {
+      const messageElement = document.createElement("div");
+      messageElement.className = `message message-${role}`;
+      messageElement.innerHTML = `<div class="message-role">${role}</div><div class="message-text"></div>`;
+      messageElement.querySelector(".message-text").textContent = text;
+      messagesEl.appendChild(messageElement);
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+      return messageElement;
+    }
+
+    function setAssistantText(el, text) {
+      el.querySelector(".message-text").textContent = text;
+      messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    form.addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const prompt = promptInput.value.trim();
+      if (!prompt) return;
+
+      const userMessage = addMessage("user", prompt);
+      promptInput.value = "";
+      promptInput.focus();
+
+      const assistantMessage = addMessage("assistant", "Waiting for response...");
+      const stream = streamCheckbox.checked;
+
+      try {
+        if (stream) {
+          const res = await fetch(`${baseUrl}/v1/chat/completions`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              model: modelName,
+              messages: [
+                { role: "user", content: prompt }
+              ],
+              stream: true,
+            }),
+          });
+
+          if (!res.ok) {
+            throw new Error(`Error ${res.status}`);
+          }
+
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder("utf-8");
+          let assistantText = "";
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            const chunk = decoder.decode(value, { stream: true });
+            for (const line of chunk.split("\n")) {
+              if (!line.trim().startsWith("data:")) continue;
+              const payload = line.replace(/^data:\s*/, "");
+              if (payload === "[DONE]") {
+                return;
+              }
+              try {
+                const event = JSON.parse(payload);
+                if (event.choices?.[0]?.delta?.content) {
+                  assistantText += event.choices[0].delta.content;
+                  setAssistantText(assistantMessage, assistantText);
+                }
+              } catch (error) {
+                console.warn("Failed to parse SSE chunk", error);
+              }
+            }
+          }
+        } else {
+          const res = await fetch(`${baseUrl}/v1/chat/completions`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              model: modelName,
+              messages: [
+                { role: "user", content: prompt }
+              ],
+              stream: false,
+            }),
+          });
+
+          if (!res.ok) {
+            const details = await res.text();
+            throw new Error(details || `Error ${res.status}`);
+          }
+
+          const payload = await res.json();
+          const content = payload.choices?.[0]?.message?.content || "No response.";
+          setAssistantText(assistantMessage, content);
+        }
+      } catch (error) {
+        setAssistantText(assistantMessage, `Error: ${error.message}`);
+      }
+    });
+  </script>
+</body>
+</html>

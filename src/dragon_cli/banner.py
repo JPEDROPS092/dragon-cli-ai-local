@@ -66,3 +66,31 @@ L>_   _-< 7/|_-__,__-)\,__)(".  \_>-<_/D
 '''
 
 SUBTITLE = "  DRAGON CLI — local LLM + MCP  |  /help for commands"
+
+# Compact mascot icon shown as a splash on the interactive menu. Raw string so
+# the backslashes in the art are preserved verbatim.
+ICON = r""",--.
+                          {    }
+                          K,   }
+                         /  `Y`
+                    _   /   /
+                   {_'-K.__/
+                     `/-.__L._
+                     /  ' /`\_}
+                    /  ' /     -AI PROVIDERS-
+            ____   /  ' /
+     ,-'~~~~    ~~/  ' /_
+   ,'             ``~~~%%',
+  (                     %  Y
+ {                      %% I
+{      -                 %  `.
+|       ',                %  )
+|        |   ,..__      __. Y
+|    .,_./  Y ' / ^Y   J   )|
+\           |' /   |   |   ||
+ \          L_/    . _ (_,.'(
+  \,   ,      ^^""' / |      )
+    \_  \          /,L]     /
+      '-_`-,       ` `   ./`
+         `-(_            )
+             ^^\..___,.--`"""

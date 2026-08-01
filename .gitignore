@@ -1,4 +1,3 @@
-```
 # Dependencies
 .venv/
 venv/
@@ -35,4 +34,12 @@ htmlcov/
 # Testing
 .pytest_cache/
 .mypy_cache/
-```
+
+# Local LLM models (GGUF) — large binary files, do not commit
+*.gguf
+models/*
+!models/.gitkeep
+
+# Local conversation database & exported conversations
+*.db
+conversation_*.*

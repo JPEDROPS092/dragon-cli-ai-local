@@ -73,7 +73,11 @@ async def chat_loop(session: ChatSession) -> None:
     if session.conv_id is None:
         session.start_new()
 
-    print(f"\n{C_GREEN}=== Chat started — /help for commands, /exit to quit ==={C_RESET}\n")
+    backend = getattr(session.llm, "exec_mode", "CPU")
+    n_tools = len(session.mcp.tools)
+    tools_msg = f" | {n_tools} MCP tool{'s' if n_tools != 1 else ''}" if n_tools else " | MCP off"
+    print(f"\n{C_GREEN}=== Chat started — {session.model_name} on {backend}{tools_msg} "
+          f"— /help for commands, /exit to quit ==={C_RESET}\n")
     while True:
         try:
             user_input = (await asyncio.to_thread(input, f"{C_YELLOW}You:{C_RESET} ")).strip()

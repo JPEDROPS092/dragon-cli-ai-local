@@ -11,6 +11,7 @@ requires-python = ">=3.10"
 license = "MIT"
 authors = [{ name = "JPEDROPS092" }]
 dependencies = [
+    "rich",
     "huggingface_hub",
     "psutil",
     "mcp",

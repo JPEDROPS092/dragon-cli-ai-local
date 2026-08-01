@@ -67,7 +67,26 @@ def build_parser() -> argparse.ArgumentParser:
                          default="balanced", help="optimization priority for --recommend or --auto")
     parser.add_argument("--auto", action="store_true",
                          help="automatically select the best model for your hardware")
+
+    # --- GPU / execution backend control ---------------------------------
+    gpu_group = parser.add_mutually_exclusive_group()
+    gpu_group.add_argument("--gpu", action="store_true",
+                           help="force GPU acceleration (offload all layers) when a GPU is present")
+    gpu_group.add_argument("--cpu", action="store_true",
+                           help="force CPU-only mode (ignore any GPU)")
+    parser.add_argument("--n-gpu-layers", "--ngl", dest="n_gpu_layers", type=int, default=-1,
+                        help="number of model layers to offload to the GPU "
+                             "(-1 = auto from hardware, 0 = CPU only, >0 = explicit count)")
     return parser
+
+
+def _has_action_flag(args) -> bool:
+    """True if a CLI flag targets a specific action (skip the fancy menu)."""
+    return any(
+        getattr(args, name, False)
+        for name in ("list", "profile", "recommend", "serve",
+                     "list_conversations", "auto", "model", "resume")
+    )
 
 
 def main() -> None:
@@ -76,11 +95,9 @@ def main() -> None:
 
     args = build_parser().parse_args()
 
-    print(C_CYAN + BANNER + C_RESET)
-    print(C_YELLOW + SUBTITLE + C_RESET + "\n")
-
-    # Handle new flags before banner display
+    # Single-shot, print-and-exit flags (plain banner + ANSI output).
     if args.profile:
+        print(C_CYAN + BANNER + C_RESET)
         from .hardware import print_hardware_profile
         print_hardware_profile()
         return
@@ -93,6 +110,17 @@ def main() -> None:
     if args.list:
         list_catalog()
         return
+
+    # Default (no action flag): launch the fancy rich-based interactive menu.
+    # The menu does its own per-action dependency checks, so it shows even if
+    # llama-cpp-python isn't installed yet.
+    if not _has_action_flag(args):
+        from .menu import run as run_menu
+        run_menu(args)
+        return
+
+    print(C_CYAN + BANNER + C_RESET)
+    print(C_YELLOW + SUBTITLE + C_RESET + "\n")
 
     required = [("llama_cpp", "llama-cpp-python"), ("huggingface_hub", "huggingface_hub")]
     if args.serve:

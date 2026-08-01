@@ -9,6 +9,17 @@ from .models import MODEL_CATALOG, available_ram_gb, download_model, list_catalo
 from .storage import ConversationStore
 
 
+def _gpu_layers_arg(args) -> int | None:
+    """Translate ``--n-gpu-layers`` into a ``load_llm`` override.
+
+    The CLI default is -1 (auto). Any value >= 0 is an explicit override
+    (0 = CPU only, >0 = exact layer count). None means "let the runtime
+    auto-decide".
+    """
+    n = getattr(args, "n_gpu_layers", -1)
+    return n if n is not None and n >= 0 else None
+
+
 def choose_model(args) -> dict | None:
     # Handle --auto flag for automatic model selection
     if getattr(args, 'auto', False):
@@ -26,8 +37,11 @@ def choose_model(args) -> dict | None:
             print(f"{C_RED}[error]{C_RESET} No compatible models found for your hardware.")
             # Fall back to manual selection
             pass
-    
-    list_catalog()
+
+    # Skip the plain catalog print when a model was already chosen upstream
+    # (e.g. by the rich interactive menu), so the user doesn't see it twice.
+    if not args.model:
+        list_catalog()
     if args.model:
         choice = args.model
     else:
@@ -64,7 +78,10 @@ async def run(args) -> None:
         if not model:
             return
         path = download_model(model)
-        llm = load_llm(path, model["ctx"])
+        llm = load_llm(path, model["ctx"], model_info=model,
+                       gpu_layers=_gpu_layers_arg(args),
+                       force_cpu=getattr(args, "cpu", False),
+                       force_gpu=getattr(args, "gpu", False))
         from .server import run_server
         await run_server(llm, model["name"], args.host, args.port)
         return
@@ -82,7 +99,10 @@ async def run(args) -> None:
         return
 
     path = download_model(model)
-    llm = load_llm(path, model["ctx"])
+    llm = load_llm(path, model["ctx"], model_info=model,
+                   gpu_layers=_gpu_layers_arg(args),
+                   force_cpu=getattr(args, "cpu", False),
+                   force_gpu=getattr(args, "gpu", False))
 
     mcp = MCPManager()
     if not args.no_mcp:

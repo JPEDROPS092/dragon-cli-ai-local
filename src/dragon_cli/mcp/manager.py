@@ -4,6 +4,58 @@ import json
 
 from ..config import C_DIM, C_GREEN, C_RED, C_RESET, C_YELLOW, EXAMPLE_MCP_CONFIG, MCP_CONFIG_FILE
 
+# Ready-to-use MCP server presets. ``args`` may contain ``{dir}``` placeholders
+# filled in at add-time. Each is a commonly used, publicly available connector.
+MCP_PRESETS = {
+    "filesystem": {
+        "description": "Read/write files in a folder you choose",
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-filesystem", "."],
+    },
+    "fetch": {
+        "description": "Fetch and summarize web pages",
+        "command": "uvx",
+        "args": ["--with", "mcp<1.0", "mcp-server-fetch"],
+    },
+    "git": {
+        "description": "Inspect and operate on local git repos",
+        "command": "uvx",
+        "args": ["mcp-server-git", "--repository", "."],
+    },
+    "memory": {
+        "description": "Persistent knowledge graph memory",
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-memory"],
+    },
+    "sqlite": {
+        "description": "Query a local SQLite database file",
+        "command": "uvx",
+        "args": ["mcp-server-sqlite", "--db-path", "memory.db"],
+    },
+    "time": {
+        "description": "Current time and timezone conversion",
+        "command": "uvx",
+        "args": ["mcp-server-time"],
+    },
+}
+
+
+def load_mcp_config() -> dict:
+    """Read mcp_servers.json, creating the example file if absent."""
+    if not MCP_CONFIG_FILE.exists():
+        MCP_CONFIG_FILE.write_text(json.dumps(EXAMPLE_MCP_CONFIG, indent=2), encoding="utf-8")
+    try:
+        return json.loads(MCP_CONFIG_FILE.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return {"mcpServers": {}}
+
+
+def save_mcp_config(servers: dict) -> None:
+    """Write the mcpServers dict back to mcp_servers.json."""
+    MCP_CONFIG_FILE.write_text(
+        json.dumps({"mcpServers": servers}, indent=2), encoding="utf-8"
+    )
+
 
 class MCPManager:
     """Connects to MCP (stdio) servers defined in mcp_servers.json."""
@@ -46,10 +98,14 @@ class MCPManager:
                 result = await session.list_tools()
                 self.sessions[name] = session
                 for t in result.tools:
+                    # mcp SDK >=1.0 renamed inputSchema -> input_schema.
+                    schema = getattr(t, "input_schema", None)
+                    if schema is None:
+                        schema = getattr(t, "inputSchema", {}) or {}
                     self.tools[f"{name}.{t.name}"] = {
                         "server": name, "tool": t.name,
                         "description": t.description or "",
-                        "schema": t.inputSchema,
+                        "schema": schema,
                     }
                 print(f"{C_GREEN}[mcp]{C_RESET} '{name}' connected ({len(result.tools)} tools)")
             except Exception as e:

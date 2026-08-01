@@ -18,11 +18,11 @@ EXAMPLE_MCP_CONFIG = {
     "mcpServers": {
         "filesystem": {
             "command": "npx",
-            "args": ["-y", "@modelcontextprotocol/server-filesystem", "C:\\Users\\YOUR_USER\\Documents"],
+            "args": ["-y", "@modelcontextprotocol/server-filesystem", "."],
         },
         "fetch": {
             "command": "uvx",
-            "args": ["mcp-server-fetch"],
+            "args": ["--with", "mcp<1.0", "mcp-server-fetch"],
         },
     }
 }

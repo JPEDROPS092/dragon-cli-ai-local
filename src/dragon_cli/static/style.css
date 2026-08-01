@@ -210,3 +210,143 @@ input[type="checkbox"] {
     min-height: auto;
   }
 }
+
+/* ---------- Welcome page ---------- */
+.welcome-shell {
+  max-width: 920px;
+  margin: 0 auto;
+  padding: 3rem 1.25rem 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.welcome-hero {
+  text-align: center;
+  background: rgba(14, 24, 38, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 28px;
+  padding: 2.5rem 2rem;
+}
+
+.welcome-icon {
+  width: 80px;
+  height: 80px;
+  object-fit: contain;
+  border-radius: 22px;
+  background: linear-gradient(135deg, #2c5a7b, #0f2334);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 0.9rem;
+}
+
+.welcome-hero h1 {
+  margin: 1.25rem 0 0.5rem;
+  font-size: 2rem;
+}
+
+.welcome-sub {
+  margin: 0 auto 1.5rem;
+  max-width: 560px;
+  color: #8fabc6;
+  line-height: 1.6;
+}
+
+.cta {
+  display: inline-block;
+  text-decoration: none;
+  border-radius: 999px;
+  padding: 0.85rem 1.6rem;
+  background: linear-gradient(135deg, #2b9bff, #4fc3ff);
+  color: #081116;
+  font-weight: 700;
+}
+
+.cta:hover {
+  opacity: 0.95;
+}
+
+.welcome-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.25rem;
+}
+
+.card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 1.5rem;
+}
+
+.card h2 {
+  margin: 0 0 0.85rem;
+  font-size: 1.1rem;
+  color: #90d7ff;
+}
+
+.card p {
+  margin: 0 0 0.75rem;
+  line-height: 1.6;
+  color: #b7c8de;
+}
+
+.endpoint-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.endpoint-list li {
+  color: #b7c8de;
+  line-height: 1.5;
+}
+
+.code-block {
+  margin: 0.25rem 0 0;
+  padding: 1rem;
+  background: rgba(6, 14, 24, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  color: #d6e7f5;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.welcome-footer {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  justify-content: center;
+  align-items: center;
+  color: #8fabc6;
+  font-size: 0.9rem;
+  padding-top: 0.5rem;
+}
+
+.welcome-footer a {
+  color: #90d7ff;
+  text-decoration: none;
+}
+
+.welcome-footer a:hover {
+  text-decoration: underline;
+}
+
+.instructions a,
+.welcome-footer a {
+  color: #90d7ff;
+}
+
+code {
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 6px;
+  padding: 0.1rem 0.35rem;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 0.85em;
+}
+

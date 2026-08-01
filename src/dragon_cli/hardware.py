@@ -160,25 +160,34 @@ def get_gpu_info() -> Dict[str, Any]:
                 continue
         
         if cuda_lib is not None:
+            # The driver API must be initialized before any query, otherwise
+            # cuDeviceGetCount returns CUDA_ERROR_NOT_INITIALIZED (3) and the
+            # GPU is wrongly reported as absent.
+            cuda_lib.cuInit(0)
+
             # Check CUDA device count
             device_count = ctypes.c_int()
             result = cuda_lib.cuDeviceGetCount(ctypes.byref(device_count))
-            
+
             if result == 0 and device_count.value > 0:
                 gpu_available = True
                 # Get first device name
                 device = ctypes.c_int()
                 cuda_lib.cuDeviceGet(ctypes.byref(device), 0)
-                
+
                 name_buffer = ctypes.create_string_buffer(256)
                 cuda_lib.cuDeviceGetName(name_buffer, 256, device)
                 gpu_name = name_buffer.value.decode("utf-8")
-                
-                # Get memory info
-                free_mem = ctypes.c_size_t()
+
+                # Total VRAM via the driver API. cuMemGetInfo requires an
+                # active CUDA context, but cuDeviceTotalMem_v2 does not — so it
+                # works without creating/pinning a context (fall back to v1).
                 total_mem = ctypes.c_size_t()
-                cuda_lib.cuMemGetInfo(ctypes.byref(free_mem), ctypes.byref(total_mem))
-                
+                for fn_name in ("cuDeviceTotalMem_v2", "cuDeviceTotalMem"):
+                    fn = getattr(cuda_lib, fn_name, None)
+                    if fn is not None and fn(ctypes.byref(total_mem), device) == 0:
+                        break
+
                 gpu_vram_gb = total_mem.value / (1024 ** 3)
                 
     except Exception:

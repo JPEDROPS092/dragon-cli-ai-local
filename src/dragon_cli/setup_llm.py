@@ -7,182 +7,132 @@ installs the appropriate prebuilt wheel (CPU, CUDA, or ROCm) for optimal
 performance.
 """
 
+import os
 import platform
+import shutil
 import subprocess
 import sys
 
 
+WHEEL_INDEX_URLS = {
+    "cpu": "https://abetlen.github.io/llama-cpp-python/whl/cpu",
+    "cuda": "https://abetlen.github.io/llama-cpp-python/whl/cu124",
+    "rocm": "https://abetlen.github.io/llama-cpp-python/whl/rocm",
+    "mps": "https://abetlen.github.io/llama-cpp-python/whl/metal",
+}
+
+
 def detect_gpu():
-    """Detect available GPU and return GPU type."""
-    gpu_type = "cpu"  # default
-    
-    # Try NVIDIA CUDA detection
-    try:
-        import ctypes
-        cuda_lib_names = ["cuda", "nvcuda", "libcuda.so", "libcuda.so.1"]
-        
-        for lib_name in cuda_lib_names:
-            try:
-                cuda_lib = ctypes.CDLL(lib_name)
-                device_count = ctypes.c_int()
-                result = cuda_lib.cuDeviceGetCount(ctypes.byref(device_count))
-                
-                if result == 0 and device_count.value > 0:
-                    gpu_type = "cuda"
-                    print(f"[dragon-cli] Detected {device_count.value} NVIDIA GPU(s)")
-                    
-                    # Get CUDA version if possible
-                    try:
-                        cuda_version = ctypes.c_int()
-                        cuda_lib.cudaRuntimeGetVersion(ctypes.byref(cuda_version))
-                        major = cuda_version.value // 1000
-                        minor = (cuda_version.value % 1000) // 10
-                        print(f"[dragon-cli] CUDA version: {major}.{minor}")
-                    except Exception:
-                        pass
-                    
-                    return gpu_type
-            except OSError:
-                continue
-    except Exception:
-        pass
-    
-    # Try PyTorch for more reliable GPU detection
-    try:
-        import torch
-        
-        if torch.cuda.is_available():
-            gpu_type = "cuda"
-            device_count = torch.cuda.device_count()
-            print(f"[dragon-cli] Detected {device_count} NVIDIA GPU(s) via PyTorch")
-            
-            for i in range(min(device_count, 3)):  # Show first 3 GPUs
-                gpu_name = torch.cuda.get_device_name(i)
-                vram_gb = torch.cuda.get_device_properties(i).total_memory / (1024 ** 3)
-                print(f"[dragon-cli]   GPU {i}: {gpu_name} ({vram_gb:.1f} GB VRAM)")
-            
-            return gpu_type
-            
-    except ImportError:
-        pass
-    
-    # Try AMD ROCm detection (Linux only)
+    """Detect available GPU and return GPU type.
+
+    Prefer system commands such as nvidia-smi and rocm-smi because they work
+    even in stripped-down virtual environments where torch or CUDA libraries
+    may not be installed yet.
+    """
+    gpu_type = "cpu"
+
+    nvidia_smi = shutil.which("nvidia-smi")
+    if nvidia_smi:
+        result = subprocess.run(
+            [nvidia_smi, "--query-gpu=name,memory.total", "--format=csv,noheader"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode == 0:
+            first_line = next((line.strip() for line in result.stdout.splitlines() if line.strip()), "")
+            if first_line:
+                gpu_name = first_line.split(",")[0].strip()
+                print(f"[dragon-cli] Detected NVIDIA GPU via nvidia-smi: {gpu_name}")
+                gpu_type = "cuda"
+                return gpu_type
+
     if platform.system() == "Linux":
-        try:
-            import subprocess
+        rocminfo = shutil.which("rocminfo")
+        if rocminfo:
             result = subprocess.run(
-                ["rocminfo"],
-                capture_output=True, text=True, timeout=5
+                [rocminfo],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
             )
             if result.returncode == 0 and "Agent" in result.stdout:
-                gpu_type = "rocm"
-                print("[dragon-cli] Detected AMD GPU(s) via ROCm")
-                return gpu_type
-        except Exception:
-            pass
-        
-        # Check for rocm-smi
-        try:
+                print("[dragon-cli] Detected AMD GPU via ROCm")
+                return "rocm"
+
+        rocm_smi = shutil.which("rocm-smi")
+        if rocm_smi:
             result = subprocess.run(
-                ["rocm-smi", "--showproductname"],
-                capture_output=True, text=True, timeout=5
+                [rocm_smi, "--showproductname"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+                check=False,
             )
             if result.returncode == 0:
-                gpu_type = "rocm"
-                print("[dragon-cli] Detected AMD GPU(s) via rocm-smi")
-                return gpu_type
-        except Exception:
-            pass
-    
-    # Try Apple Silicon detection
+                print("[dragon-cli] Detected AMD GPU via rocm-smi")
+                return "rocm"
+
     if platform.system() == "Darwin":
-        try:
-            import subprocess
+        system_profiler = shutil.which("system_profiler")
+        if system_profiler:
             result = subprocess.run(
-                ["system_profiler", "SPDisplaysDataType"],
-                capture_output=True, text=True, timeout=10
+                [system_profiler, "SPDisplaysDataType"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                check=False,
             )
             if result.returncode == 0 and "Apple" in result.stdout:
-                gpu_type = "mps"  # Metal Performance Shaders
-                print("[dragon-cli] Detected Apple Silicon GPU (Metal/MPS)")
-                return gpu_type
-        except Exception:
-            pass
-    
+                print("[dragon-cli] Detected Apple Silicon GPU via system_profiler")
+                return "mps"
+
     print("[dragon-cli] No dedicated GPU detected, using CPU-only mode")
     return gpu_type
 
 
-def get_install_command(gpu_type: str):
-    """Return the appropriate pip install command based on GPU type."""
-    
-    if gpu_type == "cuda":
-        # Install with CUDA support (llama-cpp-python will auto-detect CUDA)
-        # We'll install with CMAKE_ARGS to enable CUDA
-        print("[dragon-cli] Installing llama-cpp-python with CUDA support...")
-        print("[dragon-cli] This may take a few minutes to compile...")
-        
-        # Set environment variables for CUDA build
-        env = {
-            **subprocess.os.environ,
-            "CMAKE_ARGS": "-DGGML_CUDA=on",
-            "FORCE_CMAKE": "1",
-        }
-        
-        result = subprocess.run([
-            sys.executable, "-m", "pip", "install", 
-            "llama-cpp-python", "--no-cache-dir"
-        ], env=env)
-        
-        return result
-        
-    elif gpu_type == "rocm":
-        # Install with ROCm support
-        print("[dragon-cli] Installing llama-cpp-python with ROCm support...")
-        print("[dragon-cli] This may take a few minutes to compile...")
-        
-        env = {
-            **subprocess.os.environ,
-            "CMAKE_ARGS": "-DGGML_HIPBLAS=on",
-            "FORCE_CMAKE": "1",
-        }
-        
-        result = subprocess.run([
-            sys.executable, "-m", "pip", "install",
-            "llama-cpp-python", "--no-cache-dir"
-        ], env=env)
-        
-        return result
-        
-    elif gpu_type == "mps":
-        # Apple Silicon - use Metal acceleration
-        print("[dragon-cli] Installing llama-cpp-python with Metal (MPS) support...")
-        print("[dragon-cli] This may take a few minutes to compile...")
-        
-        env = {
-            **subprocess.os.environ,
-            "CMAKE_ARGS": "-DGGML_METAL=on",
-            "FORCE_CMAKE": "1",
-        }
-        
-        result = subprocess.run([
-            sys.executable, "-m", "pip", "install",
-            "llama-cpp-python", "--no-cache-dir"
-        ], env=env)
-        
-        return result
-        
-    else:
-        # CPU-only installation using prebuilt wheels
-        WHEEL_INDEX_URL = "https://abetlen.github.io/llama-cpp-python/whl/cpu"
-        print(f"[dragon-cli] Installing llama-cpp-python from prebuilt CPU wheels ({WHEEL_INDEX_URL})...")
-        
-        result = subprocess.run([
-            sys.executable, "-m", "pip", "install", "llama-cpp-python",
-            "--prefer-binary", "--extra-index-url", WHEEL_INDEX_URL,
-        ])
-        
-        return result
+def prompt_backend_choice(gpu_type: str) -> str:
+    """Ask the user in English which backend to use.
+
+    CPU remains the default backend for safety, even if a GPU is detected.
+    """
+    if gpu_type == "cpu":
+        print("[dragon-cli] No dedicated GPU detected. Defaulting to CPU backend.")
+        return "cpu"
+
+    print("[dragon-cli] GPU detected. Do you want to use a GPU-enabled wheel?")
+    print("[dragon-cli] Default backend: CPU")
+    print("[dragon-cli] Available backends: cpu, cuda, rocm, mps")
+
+    if not sys.stdin.isatty():
+        print("[dragon-cli] Non-interactive shell detected. Keeping CPU as the default backend.")
+        return "cpu"
+
+    answer = input("[dragon-cli] Choose backend [cpu]: ").strip().lower()
+    if answer in {"cpu", "cuda", "rocm", "mps"}:
+        return answer
+    if answer == "":
+        return "cpu"
+
+    print("[dragon-cli] Invalid choice. Keeping CPU as the default backend.")
+    return "cpu"
+
+
+def get_install_command(backend: str):
+    """Install llama-cpp-python using a prebuilt wheel backend.
+
+    CPU is the safe default; GPU backends can be selected later by the user.
+    """
+    index_url = WHEEL_INDEX_URLS.get(backend, WHEEL_INDEX_URLS["cpu"])
+    print(f"[dragon-cli] Installing llama-cpp-python from prebuilt {backend.upper()} wheels ({index_url})...")
+
+    result = subprocess.run([
+        sys.executable, "-m", "pip", "install", "llama-cpp-python",
+        "--prefer-binary", "--extra-index-url", index_url,
+    ])
+
+    return result
 
 
 TROUBLESHOOTING = {
@@ -212,27 +162,28 @@ def main() -> None:
     system = platform.system()
     print(f"[dragon-cli] Detected {system} ({platform.machine()}), Python {platform.python_version()}")
     print()
-    
-    # Detect GPU first
+
     gpu_type = detect_gpu()
     print()
-    
-    # Install appropriate version
-    result = get_install_command(gpu_type)
-    
+
+    backend = prompt_backend_choice(gpu_type)
+    print()
+
+    result = get_install_command(backend)
+
     if result.returncode == 0:
         print()
         print("[dragon-cli] ✓ llama-cpp-python installed successfully!")
-        
-        if gpu_type != "cpu":
-            print(f"[dragon-cli] GPU acceleration enabled ({gpu_type.upper()})")
-            print("[dragon-cli] Models will automatically use GPU for faster inference")
+
+        if backend != "cpu":
+            print(f"[dragon-cli] GPU backend selected ({backend.upper()})")
+            print("[dragon-cli] GPU-enabled wheel installed successfully")
         else:
-            print("[dragon-cli] Running in CPU-only mode")
-            print("[dragon-cli] For faster inference, consider adding an NVIDIA or AMD GPU")
-        
+            print("[dragon-cli] CPU backend selected by default")
+            print("[dragon-cli] You can choose a GPU wheel later if needed")
+
         return
-    
+
     print("\n[dragon-cli] ✗ Installation failed.")
     print(TROUBLESHOOTING.get(
         system,
