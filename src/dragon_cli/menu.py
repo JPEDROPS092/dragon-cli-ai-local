@@ -24,7 +24,9 @@ from __future__ import annotations
 import asyncio
 import copy
 import os
+import re
 import sys
+from urllib.parse import unquote, urlparse
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
@@ -39,7 +41,7 @@ from rich.text import Text
 from . import __version__, app
 from .config import DB_FILE, MODELS_DIR
 from .hardware import detect_hardware
-from .models import MODEL_CATALOG
+from .models import MODEL_CATALOG, add_model_to_catalog
 from .recommendation import ModelRecommender
 from .runtime import RuntimeConfig
 
@@ -454,18 +456,33 @@ class InteractiveMenu:
     # 4 - Connect to hub ----------------------------------------------- #
     def _action_4(self) -> bool:
         self._show_models_table(title="Connect to hub — catalog")
-        choice = Prompt.ask(
-            f"\n[{ACCENT}]Download model[/] [{DIM}](catalog #, 's' searches HF, Enter = back)[/]",
+        choice_raw = Prompt.ask(
+            f"\n[{ACCENT}]Hub action[/] [{DIM}](catalog # download, 's' search/add, 'hf://' add direct, Enter = back)[/]",
             console=self.console, default="",
-        ).strip().lower()
+        ).strip()
+        choice = choice_raw.lower()
         if choice in ("", "0"):
             return True
         if choice in ("s", "search"):
-            self._hub_search()
+            model = self._hub_search()
+            if model:
+                idx, created = self._add_model_to_catalog(model)
+                action = "Added" if created else "Already in catalog"
+                self.console.print(f"[{GOOD}]{action}[/] as catalog #{idx}: {model['name']}")
+                if Confirm.ask("Download this model now?", console=self.console, default=True):
+                    self._download_model_entry(model)
         elif choice.isdigit() and 1 <= int(choice) <= len(MODEL_CATALOG):
             self._download_model(int(choice))
         else:
-            self.console.print(f"[{BAD}]Invalid option.[/]")
+            model = self._build_model_from_hf_reference(choice_raw)
+            if model:
+                idx, created = self._add_model_to_catalog(model)
+                action = "Added" if created else "Already in catalog"
+                self.console.print(f"[{GOOD}]{action}[/] as catalog #{idx}: {model['name']}")
+                if Confirm.ask("Download this model now?", console=self.console, default=True):
+                    self._download_model_entry(model)
+            else:
+                self.console.print(f"[{BAD}]Invalid option.[/]")
         self._pause()
         return True
 
@@ -729,9 +746,11 @@ class InteractiveMenu:
         self.console.print(f"[{DIM}]Use the number from the table above (1 = best option).[/]\n")
 
     def _download_model(self, idx: int) -> None:
+        self._download_model_entry(MODEL_CATALOG[idx - 1])
+
+    def _download_model_entry(self, model: dict) -> None:
         from .models.loader import download_model
 
-        model = MODEL_CATALOG[idx - 1]
         dest = MODELS_DIR / model["filename"]
         if dest.exists():
             self.console.print(f"[{GOOD}]Model already saved:[/] {dest}")
@@ -745,35 +764,265 @@ class InteractiveMenu:
                 return
         self.console.print(f"[{GOOD}]Saved at[/] {path}")
 
-    def _hub_search(self) -> None:
+    def _hub_search(self) -> Optional[dict]:
         from .model_hub import ModelHub
 
         query = Prompt.ask(
-            f"[{ACCENT}]Search Hugging Face[/] [{DIM}](e.g. Qwen GGUF)[/]",
+            f"[{ACCENT}]Search Hugging Face[/] [{DIM}](query, owner/repo, hf://, or HF URL)[/]",
             console=self.console, default="GGUF",
         ).strip()
+        direct_model = self._build_model_from_hf_reference(query)
+        if direct_model is not None:
+            return direct_model
+
         hub = ModelHub()
         with self.console.status(f"[{ACCENT}]Searching '{query}'...[/]", spinner="dots"):
             try:
                 results = hub.fetch_huggingface_models(search_query=query, limit=15)
             except Exception as exc:
                 self.console.print(f"[{BAD}]Search error:[/] {exc}")
-                return
+                return None
         if not results:
-            self.console.print(f"[{DIM}]No results.[/]")
-            return
+            self.console.print(
+                f"[{DIM}]No results.[/] Hugging Face search matches repositories, not always exact file names."
+            )
+            if query.lower().endswith(".gguf"):
+                self.console.print(
+                    f"[{DIM}]Tip:[/] use direct reference, e.g. "
+                    f"hf://owner/repo/{query} or paste the full HF resolve URL."
+                )
+            return None
         table = Table(title=f"[bold {ACCENT}]Hugging Face: '{query}'[/]", border_style=ACCENT)
+        table.add_column("#", style=DIM, width=3)
         table.add_column("Repository", overflow="fold")
         table.add_column("Downloads", justify="right")
         table.add_column("Likes", justify="right")
-        for m in results:
+        for i, m in enumerate(results, 1):
             table.add_row(
+                str(i),
                 m.get("name", m.get("repo_id", "?")),
                 f"{m.get('downloads', 0):,}",
                 f"{m.get('likes', 0):,}",
             )
         self.console.print(table)
-        self.console.print(f"[{DIM}]To download, use the local catalog (option 4 with a number).[/]")
+        repo_choice = IntPrompt.ask(
+            f"\n[{ACCENT}]Repository number[/] [{DIM}](0 = back)[/]",
+            console=self.console,
+            default=0,
+        )
+        if repo_choice == 0 or not (1 <= repo_choice <= len(results)):
+            return None
+
+        selected = results[repo_choice - 1]
+        repo_id = selected.get("repo_id") or selected.get("name")
+        if not repo_id:
+            self.console.print(f"[{BAD}]Selected result has no repo id.[/]")
+            return None
+
+        return self._build_model_from_repo(repo_id)
+
+    def _build_model_from_repo(self, repo_id: str) -> Optional[dict]:
+        from .model_hub import ModelHub
+
+        hub = ModelHub()
+        with self.console.status(f"[{ACCENT}]Loading GGUF files from {repo_id}...[/]", spinner="dots"):
+            files = hub.get_model_files(repo_id)
+        if not files:
+            self.console.print(f"[{BAD}]No .gguf files found in[/] {repo_id}")
+            return None
+
+        file_table = Table(title=f"[bold {ACCENT}]GGUF files — {repo_id}[/]", border_style=ACCENT)
+        file_table.add_column("#", style=DIM, width=3)
+        file_table.add_column("Filename", overflow="fold")
+        file_table.add_column("Quant", justify="center")
+        for i, fn in enumerate(files, 1):
+            file_table.add_row(str(i), fn, self._extract_quantization(fn))
+        self.console.print(file_table)
+
+        recommended_idx = self._pick_recommended_file_index(files)
+        self.console.print(
+            f"[{DIM}]Tip:[/] recommended file #{recommended_idx} for general local use."
+        )
+
+        file_choice = IntPrompt.ask(
+            f"\n[{ACCENT}]File number[/] [{DIM}](0 = back)[/]",
+            console=self.console,
+            default=recommended_idx,
+        )
+        if file_choice == 0 or not (1 <= file_choice <= len(files)):
+            return None
+
+        filename = files[file_choice - 1]
+        return self._build_model_entry(repo_id, filename)
+
+    def _build_model_entry(self, repo_id: str, filename: str) -> dict:
+        default_name = f"{repo_id.split('/')[-1]} ({self._extract_quantization(filename)}) — hub"
+        model_name = Prompt.ask(
+            f"[{ACCENT}]Catalog display name[/]",
+            console=self.console,
+            default=default_name,
+        ).strip() or default_name
+
+        params_b = self._estimate_params_billions(f"{repo_id} {filename}")
+        ram_default = self._estimate_ram_default_gb(params_b, filename)
+        vram_default = max(1.0, round(params_b * 0.7, 1))
+        layers_default = self._estimate_layer_count(params_b)
+
+        ram_min = IntPrompt.ask("Min RAM (GB)", console=self.console, default=ram_default)
+        ctx = IntPrompt.ask("Context window", console=self.console, default=8192)
+
+        return {
+            "name": model_name,
+            "repo_id": repo_id,
+            "filename": filename,
+            "ram_min_gb": max(1, ram_min),
+            "vram_min_gb": vram_default,
+            "n_layers": layers_default,
+            "ctx": max(512, ctx),
+        }
+
+    def _add_model_to_catalog(self, model: dict) -> Tuple[int, bool]:
+        return add_model_to_catalog(model, persist=True)
+
+    @staticmethod
+    def _estimate_params_billions(text: str) -> float:
+        match = re.search(r"(\d+(?:\.\d+)?)\s*[bB]", text)
+        if not match:
+            return 7.0
+        try:
+            return float(match.group(1))
+        except ValueError:
+            return 7.0
+
+    @staticmethod
+    def _estimate_layer_count(params_b: float) -> int:
+        if params_b <= 2:
+            return 24
+        if params_b <= 4:
+            return 28
+        if params_b <= 8:
+            return 32
+        if params_b <= 14:
+            return 40
+        return 48
+
+    @staticmethod
+    def _extract_quantization(filename: str) -> str:
+        upper = filename.upper()
+        quant_match = re.search(r"Q\d(?:_[A-Z0-9]+)*", upper)
+        return quant_match.group(0) if quant_match else "unknown"
+
+    def _build_model_from_hf_uri(self, uri: str) -> Optional[dict]:
+        """Build a catalog entry from ``hf://repo_id/filename.gguf``."""
+        raw = uri.strip()
+        if not raw.lower().startswith("hf://"):
+            self.console.print(f"[{BAD}]Invalid Hugging Face URI.[/]")
+            return None
+        payload = raw[5:]
+        if "/" not in payload:
+            self.console.print(f"[{BAD}]Expected format:[/] hf://owner/repo/file.gguf")
+            return None
+
+        parts = [p for p in payload.split("/") if p]
+        if len(parts) < 3:
+            self.console.print(f"[{BAD}]Expected format:[/] hf://owner/repo/file.gguf")
+            return None
+
+        owner = parts[0]
+        repo = parts[1]
+        filename = "/".join(parts[2:])
+        if not filename.lower().endswith(".gguf"):
+            self.console.print(f"[{BAD}]Only .gguf files are supported here.[/]")
+            return None
+
+        repo_id = f"{owner}/{repo}"
+        return self._build_model_entry(repo_id, filename)
+
+    def _build_model_from_hf_reference(self, raw: str) -> Optional[dict]:
+        """Accept hf:// URIs or Hugging Face resolve/blob URLs and build a model.
+
+        Returns None when ``raw`` doesn't look like a direct model reference.
+        """
+        text = raw.strip()
+        if not text:
+            return None
+
+        if text.lower().startswith("hf://"):
+            return self._build_model_from_hf_uri(text)
+
+        if text.lower().startswith("http://") or text.lower().startswith("https://"):
+            parsed = urlparse(text)
+            if "huggingface.co" not in (parsed.netloc or "").lower():
+                return None
+            parts = [unquote(p) for p in parsed.path.split("/") if p]
+            if len(parts) >= 2:
+                owner, repo = parts[0], parts[1]
+                if len(parts) >= 5:
+                    marker = parts[2].lower()
+                    if marker in ("resolve", "blob"):
+                        filename = "/".join(parts[4:])
+                        if filename.lower().endswith(".gguf"):
+                            return self._build_model_from_hf_uri(f"hf://{owner}/{repo}/{filename}")
+                return self._build_model_from_repo(f"{owner}/{repo}")
+
+        snippet_repo = self._extract_repo_id_from_text(text)
+        if snippet_repo:
+            return self._build_model_from_repo(snippet_repo)
+
+        if re.match(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", text):
+            return self._build_model_from_repo(text)
+
+        return None
+
+    @staticmethod
+    def _extract_repo_id_from_text(text: str) -> Optional[str]:
+        quoted = re.findall(r"['\"]([^'\"]+)['\"]", text)
+        for token in quoted:
+            if re.match(r"^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", token):
+                return token
+        inline = re.search(r"\b([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)\b", text)
+        if inline:
+            return inline.group(1)
+        return None
+
+    @staticmethod
+    def _estimate_ram_default_gb(params_b: float, filename: str) -> int:
+        quant = filename.upper()
+        # Conservative but closer to practical defaults for GGUF quantizations.
+        if "Q2" in quant or "IQ2" in quant:
+            factor = 0.45
+        elif "Q3" in quant or "IQ3" in quant:
+            factor = 0.6
+        elif "Q4" in quant or "IQ4" in quant:
+            factor = 0.8
+        elif "Q5" in quant:
+            factor = 1.0
+        elif "Q6" in quant:
+            factor = 1.15
+        elif "Q8" in quant:
+            factor = 1.45
+        else:
+            factor = 0.9
+        return max(2, int(round(max(1.5, params_b * factor))))
+
+    def _pick_recommended_file_index(self, files: List[str]) -> int:
+        ranked = sorted(
+            enumerate(files, start=1),
+            key=lambda item: self._file_rank(item[1]),
+        )
+        return ranked[0][0] if ranked else 1
+
+    @staticmethod
+    def _file_rank(filename: str) -> Tuple[int, int, str]:
+        upper = filename.upper()
+        # Prefer common local-friendly quantizations first.
+        quant_priority = [
+            "Q4_K_M", "Q4_K_S", "Q4_0", "Q5_K_M", "Q5_0", "Q3_K_M", "Q8_0",
+        ]
+        for i, q in enumerate(quant_priority):
+            if q in upper:
+                return (i, len(filename), upper)
+        return (len(quant_priority), len(filename), upper)
 
     def _show_profile(self) -> None:
         hw = self.hardware

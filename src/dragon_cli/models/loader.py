@@ -10,15 +10,36 @@ from ..config import C_GREEN, C_RED, C_RESET, C_YELLOW, MODELS_DIR
 
 
 def download_model(model: dict) -> Path:
-    from huggingface_hub import hf_hub_download
+    from huggingface_hub import HfApi, hf_hub_download
+
+    repo_id = model["repo_id"]
+    filename = model["filename"]
+
+    # HF file paths are case-sensitive. If catalog data was saved in lowercase,
+    # resolve the exact-cased filename from the repository before downloading.
+    try:
+        api = HfApi()
+        files = api.list_repo_files(repo_id=repo_id)
+        if filename not in files:
+            by_lower = {f.lower(): f for f in files}
+            resolved = by_lower.get(filename.lower())
+            if resolved:
+                print(f"{C_YELLOW}[download]{C_RESET} Using canonical HF filename: {resolved}")
+                filename = resolved
+                model["filename"] = resolved
+    except Exception:
+        # If listing fails (network/rate limit), keep original filename and let
+        # hf_hub_download surface a clear error.
+        pass
+
     MODELS_DIR.mkdir(exist_ok=True)
-    destination = MODELS_DIR / model["filename"]
+    destination = MODELS_DIR / filename
     if destination.exists():
         print(f"{C_GREEN}[ok]{C_RESET} Model already saved at {destination}")
         return destination
-    print(f"{C_YELLOW}[download]{C_RESET} Downloading {model['filename']} "
+    print(f"{C_YELLOW}[download]{C_RESET} Downloading {filename} "
           f"(a few GB, only happens once)...")
-    path = hf_hub_download(repo_id=model["repo_id"], filename=model["filename"], local_dir=str(MODELS_DIR))
+    path = hf_hub_download(repo_id=repo_id, filename=filename, local_dir=str(MODELS_DIR))
     print(f"{C_GREEN}[ok]{C_RESET} Saved to {path}")
     return Path(path)
 

@@ -37,13 +37,21 @@ class ModelHub:
             from huggingface_hub import HfApi
             api = HfApi()
             
-            # Search for GGUF models
-            models = api.list_models(
-                search=search_query,
-                limit=limit,
-                sort="downloads",
-                direction=-1,  # Most downloaded first
-            )
+            # Search for GGUF models. ``direction`` is not supported in some
+            # huggingface_hub versions, so fall back to a signature-compatible call.
+            try:
+                models = api.list_models(
+                    search=search_query,
+                    limit=limit,
+                    sort="downloads",
+                    direction=-1,
+                )
+            except TypeError:
+                models = api.list_models(
+                    search=search_query,
+                    limit=limit,
+                    sort="downloads",
+                )
             
             results = []
             for model in models:
