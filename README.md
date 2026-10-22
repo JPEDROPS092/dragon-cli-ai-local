@@ -1,6 +1,6 @@
 # Dragon CLI
 
-![1785346956957](image/README/1785346956957.png)
+![1785346956957](https://raw.githubusercontent.com/JPEDROPS092/dragon-cli-ai-local/main/image/README/1785346956957.png)
 
 [![License: MIT](https://img.shields.io/github/license/JPEDROPS092/dragon-cli-ai-local)](LICENSE)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)](https://www.python.org/)
@@ -8,38 +8,61 @@
 [![GitHub stars](https://img.shields.io/github/stars/JPEDROPS092/dragon-cli-ai-local?style=social)](https://github.com/JPEDROPS092/dragon-cli-ai-local/stargazers)
 [![GitHub issues](https://img.shields.io/github/issues/JPEDROPS092/dragon-cli-ai-local)](https://github.com/JPEDROPS092/dragon-cli-ai-local/issues)
 
-Chat with local GGUF LLMs (100% CPU, via `llama-cpp-python`), with optional
-MCP (Model Context Protocol) tool-calling and a SQLite-backed conversation
-history.
+[![PyPI](https://img.shields.io/pypi/v/dragon-cli)](https://pypi.org/project/dragon-cli/)
+
+Chat with local GGUF LLMs on CPU or GPU (via `llama-cpp-python`), with
+MCP (Model Context Protocol) tool-calling, a SQLite-backed conversation
+history, and an OpenAI-compatible HTTP server you can plug into agent
+frameworks (OpenAI SDK, OpenAI Agents SDK, LangChain, LlamaIndex, CrewAI,
+Continue, Aider, Open WebUI...).
+
+📖 **Full docs, guides and agent-framework examples:**
+https://jpedrops092.github.io/dragon-cli-ai-local/
 
 ## Install
 
+Requires Python 3.10+ on Windows, Linux or macOS.
+
 ```bash
-pip install -e .
-dragon-cli-install-llm
+pip install dragon-cli
+dragon-cli-install-llm   # installs the right llama-cpp-python build for your CPU/GPU
+dragon-cli               # interactive menu
 ```
 
-This exposes a `dragon-cli` command. `llama-cpp-python` is intentionally kept
-out of the core dependencies, since it ships as C++ source on PyPI for many
-platforms — a plain `pip install` would try to compile it locally and fail
-without a C/C++ toolchain (Visual Studio Build Tools on Windows, gcc on
-Linux, Xcode command line tools on macOS).
+Upgrade with `pip install -U dragon-cli`. A virtual environment is
+recommended (`python -m venv .venv` and activate it first).
 
-`dragon-cli-install-llm` detects your OS/architecture (Windows, Linux, or
-macOS) and installs a prebuilt CPU wheel instead, so a compiler usually isn't
-needed at all. If no prebuilt wheel is available for your exact
+`llama-cpp-python` is intentionally kept out of the core dependencies, since
+it ships as C++ source on PyPI for many platforms, so a plain `pip install`
+would try to compile it locally and fail without a C/C++ toolchain (Visual
+Studio Build Tools on Windows, gcc on Linux, Xcode command line tools on
+macOS).
+
+`dragon-cli-install-llm` detects your OS/architecture and GPU (NVIDIA CUDA,
+AMD ROCm, Apple Metal) and installs a prebuilt wheel instead, so a compiler
+usually isn't needed at all. If no prebuilt wheel is available for your exact
 platform/Python combination, it prints the toolchain to install and the
 fallback command to run.
 
 If you already have a working C/C++ toolchain and would rather build from
-source yourself, skip the installer and use the extra instead:
-`pip install -e ".[llm]"`.
+source yourself: `pip install "dragon-cli[llm]"`.
 
-You can also run it without installing:
+Models (`./models`), `mcp_servers.json` and `dragon_cli.db` are created in
+the folder you run `dragon-cli` from.
+
+### Other ways to install
 
 ```bash
+# latest development version from GitHub
+pip install git+https://github.com/JPEDROPS092/dragon-cli-ai-local
+
+# from a local clone (editable)
+git clone https://github.com/JPEDROPS092/dragon-cli-ai-local
+cd dragon-cli-ai-local
+pip install -e .
+
+# or run without installing
 python dragon_cli.py
-# or
 python -m dragon_cli
 ```
 
@@ -56,6 +79,12 @@ dragon-cli --db path/to/other.db # use a different conversation database
 dragon-cli --serve               # serve the model over HTTP instead of chatting
 dragon-cli --serve --port 8080   # custom port (default: 8000)
 dragon-cli --serve --host 0.0.0.0  # expose beyond localhost (e.g. to your LAN) — opt-in only
+dragon-cli --profile             # show detected CPU/RAM/GPU and exit
+dragon-cli --recommend           # rank catalog models for your hardware
+dragon-cli --auto                # pick the best model for your hardware and chat
+dragon-cli --priority speed      # speed | quality | balanced | memory (for --auto/--recommend)
+dragon-cli --gpu / --cpu         # force full GPU offload, or CPU only
+dragon-cli --ngl 20              # offload exactly 20 layers to the GPU
 ```
 
 ## HTTP server (`--serve`)

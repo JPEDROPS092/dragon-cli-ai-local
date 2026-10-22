@@ -3,133 +3,788 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Dragon CLI — local LLM chat + MCP + HTTP server</title>
-<meta name="description" content="Chat with local GGUF LLMs on CPU, with MCP tool-calling, SQLite conversation history, and an OpenAI-compatible HTTP server.">
+<title>Dragon CLI — local LLMs, MCP tools, OpenAI-compatible server</title>
+<meta name="description" content="Run GGUF LLMs on your own machine (CPU or GPU), give them MCP tools, keep every conversation in SQLite, and plug them into any OpenAI-compatible agent framework. pip install dragon-cli.">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext x='32' y='50' font-size='52' text-anchor='middle'%3E%F0%9F%90%89%3C/text%3E%3C/svg%3E">
 <style>
-  :root { color-scheme: dark; }
-  * { box-sizing: border-box; }
-  body {
-    margin: 0; padding: 3rem 1.5rem 5rem;
-    background: #0b0f14; color: #d7e0ea;
-    font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif;
-    line-height: 1.6;
+  :root {
+    color-scheme: dark;
+    --bg: #0b0f14; --panel: #121924; --panel-2: #0d1420; --line: #212c3a; --line-2: #1c2634;
+    --text: #d7e0ea; --strong: #eef4fa; --muted: #a6b4c4; --dim: #62707f;
+    --accent: #23d18b; --accent-2: #7fe0d1; --link: #67c9ff; --code: #c7e8ff; --warn: #f5c26b;
   }
-  main { max-width: 760px; margin: 0 auto; }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, "Segoe UI", Helvetica, Arial, sans-serif; line-height: 1.6;
+  }
+  a { color: var(--link); }
+  code { font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: 0.92em; }
+  p code, li code, td code { background: #16202c; padding: 0.08em 0.35em; border-radius: 4px; color: var(--code); }
 
-  header { text-align: center; margin-bottom: 1rem; }
-  .dragon { font-size: 4rem; line-height: 1; }
-  .mascot { width: 200px; max-width: 60vw; height: auto; filter: drop-shadow(0 0 24px rgba(35, 209, 139, 0.25)); }
-  h1 { margin: 0.5rem 0 0.25rem; font-size: 2rem; color: #eef4fa; }
-  .tagline { margin: 0; color: #7fe0d1; font-size: 1.05rem; }
+  nav {
+    position: sticky; top: 0; z-index: 10; background: rgba(11, 15, 20, 0.9);
+    backdrop-filter: blur(8px); border-bottom: 1px solid var(--line-2);
+  }
+  nav .inner { max-width: 1000px; margin: 0 auto; padding: 0.6rem 16px; display: flex; gap: 1.1rem; align-items: center; overflow-x: auto; white-space: nowrap; }
+  nav .brand { font-weight: 700; color: var(--strong); text-decoration: none; margin-right: auto; }
+  nav a.l { color: var(--muted); text-decoration: none; font-size: 0.88rem; }
+  nav a.l:hover { color: var(--accent-2); }
 
-  .badges { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.4rem; margin: 1.25rem 0 2rem; }
+  main { max-width: 1000px; margin: 0 auto; padding: 0 16px 5rem; }
+
+  header.hero { text-align: center; padding: 3rem 0 1rem; }
+  .mascot { width: 180px; max-width: 55vw; height: auto; filter: drop-shadow(0 0 24px rgba(35, 209, 139, 0.25)); }
+  h1 { margin: 0.5rem 0 0.4rem; font-size: clamp(1.8rem, 5vw, 2.6rem); color: var(--strong); letter-spacing: -0.01em; }
+  .tagline { margin: 0 auto; max-width: 640px; color: var(--accent-2); font-size: 1.08rem; }
+  .badges { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.4rem; margin: 1.25rem 0; }
   .badges img { height: 20px; }
 
-  .cta { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.75rem; margin-bottom: 2.5rem; }
-  .btn {
-    display: inline-block; padding: 0.55rem 1.1rem; border-radius: 8px;
-    text-decoration: none; font-size: 0.92rem; font-weight: 600;
-  }
-  .btn.primary { background: #23d18b; color: #06140d; }
-  .btn.secondary { background: #16202c; color: #d7e0ea; border: 1px solid #253242; }
+  .install-hero { max-width: 520px; margin: 1.5rem auto 1rem; text-align: left; }
+  .cta { display: flex; flex-wrap: wrap; justify-content: center; gap: 0.75rem; margin: 1.25rem 0 0.5rem; }
+  .btn { display: inline-block; padding: 0.55rem 1.1rem; border-radius: 8px; text-decoration: none; font-size: 0.92rem; font-weight: 600; }
+  .btn.primary { background: var(--accent); color: #06140d; }
+  .btn.secondary { background: #16202c; color: var(--text); border: 1px solid #253242; }
 
-  section { margin: 2.5rem 0; }
-  h2 { font-size: 1.15rem; color: #7fe0d1; margin-bottom: 0.75rem; }
+  section { margin: 4rem 0; scroll-margin-top: 4rem; }
+  h2 { font-size: 1.5rem; color: var(--strong); margin: 0 0 0.35rem; }
+  .lead { color: var(--muted); margin: 0 0 1.5rem; max-width: 720px; }
+  h3 { font-size: 1rem; color: var(--strong); margin: 1.75rem 0 0.5rem; }
 
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 1rem; }
-  .card {
-    background: #121924; border: 1px solid #212c3a; border-radius: 10px;
-    padding: 1rem 1.15rem;
-  }
-  .card h3 { margin: 0 0 0.4rem; font-size: 0.98rem; color: #eef4fa; }
-  .card p { margin: 0; font-size: 0.88rem; color: #a6b4c4; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 1.1rem 1.2rem; }
+  .card .ico { font-size: 1.35rem; line-height: 1; }
+  .card h3 { margin: 0.55rem 0 0.35rem; font-size: 1rem; }
+  .card p { margin: 0; font-size: 0.9rem; color: var(--muted); }
+  .card ul { margin: 0.5rem 0 0; padding-left: 1.1rem; font-size: 0.88rem; color: var(--muted); }
 
+  .code { position: relative; }
   pre {
-    background: #0d1420; border: 1px solid #1c2634; border-radius: 8px;
-    padding: 0.9rem 1rem; overflow-x: auto; font-size: 0.85rem; color: #c7e8ff;
+    margin: 0; background: var(--panel-2); border: 1px solid var(--line-2); border-radius: 10px;
+    padding: 0.95rem 1rem; overflow-x: auto; font-size: 0.85rem; color: var(--code); line-height: 1.55;
   }
-  code { font-family: ui-monospace, Consolas, monospace; }
-  a { color: #67c9ff; }
+  pre .c { color: #5f7186; }
+  .copy {
+    position: absolute; top: 0.5rem; right: 0.5rem; background: #16202c; color: var(--muted);
+    border: 1px solid #253242; border-radius: 6px; font-size: 0.75rem; padding: 0.2rem 0.55rem; cursor: pointer;
+  }
+  .copy:hover { color: var(--strong); }
 
+  .steps { counter-reset: s; display: grid; gap: 1.25rem; }
+  .step { display: grid; grid-template-columns: 2rem minmax(0, 1fr); gap: 0.75rem; }
+  .step::before {
+    counter-increment: s; content: counter(s); width: 2rem; height: 2rem; border-radius: 50%;
+    background: #10261d; color: var(--accent); font-weight: 700; display: grid; place-items: center; font-size: 0.9rem;
+  }
+  .step h3 { margin: 0.2rem 0 0.4rem; }
+  .step p { margin: 0 0 0.6rem; color: var(--muted); font-size: 0.92rem; }
+
+  .tabs { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.75rem; }
+  .tab {
+    background: #121924; color: var(--muted); border: 1px solid var(--line); border-radius: 999px;
+    padding: 0.35rem 0.85rem; font-size: 0.85rem; cursor: pointer; font-family: inherit;
+  }
+  .tab[aria-selected="true"] { background: var(--accent); color: #06140d; border-color: var(--accent); font-weight: 600; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+  .panel > p { color: var(--muted); font-size: 0.9rem; margin: 0 0 0.6rem; }
+
+  .note {
+    border: 1px solid #3a3220; background: #1a1710; color: #e8d9b5; border-radius: 10px;
+    padding: 0.8rem 1rem; font-size: 0.88rem; margin-top: 1rem;
+  }
+  .note strong { color: var(--warn); }
+
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line-2); border-radius: 10px; }
   table { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
-  th, td { text-align: left; padding: 0.4rem 0.6rem; border-bottom: 1px solid #1c2634; }
-  th { color: #8a97a8; font-weight: 600; }
+  th, td { text-align: left; padding: 0.55rem 0.8rem; border-bottom: 1px solid var(--line-2); vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+  th { color: #8a97a8; font-weight: 600; background: #0f151e; }
+  td:first-child { white-space: nowrap; }
 
-  footer { margin-top: 3rem; text-align: center; color: #62707f; font-size: 0.85rem; }
+  .term { background: #070a0e; border: 1px solid var(--line-2); border-radius: 10px; overflow: hidden; }
+  .term .bar { display: flex; gap: 6px; align-items: center; padding: 0.5rem 0.75rem; background: #10161f; border-bottom: 1px solid var(--line-2); }
+  .term .bar i { width: 10px; height: 10px; border-radius: 50%; background: #2a3442; display: block; }
+  .term .bar span { margin-left: 0.5rem; font-size: 0.75rem; color: var(--dim); font-family: ui-monospace, Consolas, monospace; }
+  .term pre { border: 0; border-radius: 0; background: transparent; color: #cdd6e0; }
+  .term .p { color: var(--accent); }
+  .term .y { color: #e5c07b; }
+  .term .g { color: #6fd08c; }
+  .term .r { color: #ef6b73; }
+  .term .cy { color: #56c8d8; }
+  .term .d { color: #5f7186; }
+  .term .u { color: var(--strong); font-weight: 600; }
+
+  details.guide { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; margin-bottom: 0.75rem; }
+  details.guide > summary { cursor: pointer; padding: 0.9rem 1.1rem; list-style: none; display: flex; gap: 0.75rem; align-items: baseline; }
+  details.guide > summary::-webkit-details-marker { display: none; }
+  details.guide > summary::before { content: "▸"; color: var(--accent); transition: transform 0.15s; display: inline-block; }
+  details.guide[open] > summary::before { transform: rotate(90deg); }
+  details.guide > summary b { color: var(--strong); }
+  details.guide > summary small { color: var(--dim); font-size: 0.82rem; }
+  details.guide .body { padding: 0 1.1rem 1.1rem; }
+  details.guide .body > p, details.guide .body li { color: var(--muted); font-size: 0.92rem; }
+  details.guide .body ol { padding-left: 1.2rem; }
+
+  .two { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap: 1.25rem; }
+  .two > * { min-width: 0; }
+
+  footer { margin-top: 4rem; padding-top: 2rem; border-top: 1px solid var(--line-2); text-align: center; color: var(--dim); font-size: 0.85rem; }
 </style>
 </head>
 <body>
+<nav>
+  <div class="inner">
+    <a class="brand" href="#">🐉 Dragon CLI</a>
+    <a class="l" href="#features">Features</a>
+    <a class="l" href="#install">Install</a>
+    <a class="l" href="#usage">Usage</a>
+    <a class="l" href="#guides">Guides</a>
+    <a class="l" href="#agents">Agent frameworks</a>
+    <a class="l" href="#mcp">MCP tools</a>
+    <a class="l" href="#reference">Reference</a>
+  </div>
+</nav>
+
 <main>
-  <header>
-    <img class="mascot" src="assets/dragon-cli-mascot.png" alt="Dragon CLI mascot — a cybernetic dragon">
+  <header class="hero">
+    <img class="mascot" src="assets/dragon-cli-mascot.png" alt="Dragon CLI mascot, a cybernetic dragon">
     <h1>Dragon CLI</h1>
-    <p class="tagline">Chat with local GGUF LLMs on your own CPU — with MCP tools, saved conversations, and an OpenAI-compatible server.</p>
+    <p class="tagline">Run open-weight LLMs on your own machine, give them tools through MCP, and plug them into any agent framework that speaks the OpenAI API.</p>
+
+    <div class="badges">
+      <img src="https://img.shields.io/pypi/v/dragon-cli" alt="PyPI version">
+      <img src="https://img.shields.io/github/license/JPEDROPS092/dragon-cli-ai-local" alt="License">
+      <img src="https://img.shields.io/badge/python-3.10%2B-blue" alt="Python 3.10+">
+      <img src="https://img.shields.io/github/stars/JPEDROPS092/dragon-cli-ai-local?style=social" alt="GitHub stars">
+    </div>
+
+    <div class="install-hero code">
+      <pre><code>pip install dragon-cli
+dragon-cli-install-llm   <span class="c"># picks the right llama.cpp build for your CPU/GPU</span>
+dragon-cli</code></pre>
+    </div>
+
+    <div class="cta">
+      <a class="btn primary" href="#install">Get started</a>
+      <a class="btn secondary" href="#agents">Use with agents</a>
+      <a class="btn secondary" href="https://github.com/JPEDROPS092/dragon-cli-ai-local">GitHub</a>
+    </div>
   </header>
 
-  <div class="badges">
-    <img src="https://img.shields.io/github/license/JPEDROPS092/dragon-cli-ai-local" alt="License">
-    <img src="https://img.shields.io/badge/python-3.10%2B-blue" alt="Python 3.10+">
-    <img src="https://img.shields.io/github/stars/JPEDROPS092/dragon-cli-ai-local?style=social" alt="GitHub stars">
-  </div>
-
-  <div class="cta">
-    <a class="btn primary" href="https://github.com/JPEDROPS092/dragon-cli-ai-local">View on GitHub</a>
-    <a class="btn secondary" href="https://github.com/JPEDROPS092/dragon-cli-ai-local#readme">Read the docs</a>
-    <a class="btn secondary" href="https://github.com/JPEDROPS092/dragon-cli-ai-local/issues">Report an issue</a>
-  </div>
-
-  <section>
+  <section id="features">
     <h2>What it does</h2>
+    <p class="lead">One command line tool that covers the whole local-LLM loop: choosing a model that fits your hardware, downloading it, chatting with it, giving it tools, and serving it to other apps.</p>
     <div class="grid">
       <div class="card">
-        <h3>100% local, CPU-only chat</h3>
-        <p>Downloads GGUF models from Hugging Face and runs them with llama.cpp — no GPU, no cloud API key.</p>
+        <div class="ico">💬</div>
+        <h3>Local streaming chat</h3>
+        <p>Talk to GGUF models through llama.cpp with tokens streamed as they're generated. No cloud API key, nothing leaves your machine.</p>
       </div>
       <div class="card">
+        <div class="ico">⚡</div>
+        <h3>CPU or GPU, auto-tuned</h3>
+        <p>Detects NVIDIA (CUDA), AMD (ROCm) and Apple Silicon (Metal). Offloads as many layers as your VRAM allows and backs off gracefully when it runs out.</p>
+      </div>
+      <div class="card">
+        <div class="ico">🧠</div>
+        <h3>Hardware-aware recommendations</h3>
+        <p>Profiles your RAM, CPU and GPU, then ranks models by <code>speed</code>, <code>quality</code>, <code>balanced</code> or <code>memory</code>. <code>--auto</code> picks for you.</p>
+      </div>
+      <div class="card">
+        <div class="ico">🤗</div>
+        <h3>Hugging Face hub</h3>
+        <p>A curated catalog (Qwen 2.5, Llama 3.x, DeepSeek-R1 distills and more), plus search across the Hub. Add any GGUF by repo id, URL or <code>hf://</code> path.</p>
+      </div>
+      <div class="card">
+        <div class="ico">🔧</div>
         <h3>MCP tool-calling</h3>
-        <p>Connect any MCP (Model Context Protocol) stdio server and the model can call its tools mid-conversation.</p>
+        <p>Connect Model Context Protocol servers (filesystem, git, fetch, SQLite, memory, time, or your own) and the model calls their tools mid-conversation.</p>
       </div>
       <div class="card">
-        <h3>Persistent conversations</h3>
-        <p>Every message autosaves to SQLite. List, resume, rename, delete, search, and export past conversations.</p>
+        <div class="ico">🗂️</div>
+        <h3>Conversation history</h3>
+        <p>Every message is saved to SQLite the moment it's sent. Resume, rename, search, delete, or export a conversation to Markdown or JSON.</p>
       </div>
       <div class="card">
+        <div class="ico">🌐</div>
         <h3>OpenAI-compatible server</h3>
-        <p><code>dragon-cli --serve</code> exposes the model over HTTP, with Swagger UI and ReDoc auto-generated by FastAPI.</p>
+        <p><code>--serve</code> exposes <code>/v1/chat/completions</code> (with streaming) and <code>/v1/models</code>, plus Swagger docs and a browser chat UI.</p>
+      </div>
+      <div class="card">
+        <div class="ico">🖥️</div>
+        <h3>Interactive menu</h3>
+        <p>Run <code>dragon-cli</code> with no flags for a full-screen menu: arrow keys, number shortcuts, and slash commands like <code>/hub</code> or <code>/serve</code>.</p>
       </div>
     </div>
   </section>
 
-  <section>
-    <h2>Install</h2>
-    <pre><code>pip install -e .
-dragon-cli-install-llm   # detects your OS, installs a prebuilt llama-cpp-python wheel</code></pre>
-    <p>See the <a href="https://github.com/JPEDROPS092/dragon-cli-ai-local#readme">README</a> for the full install and troubleshooting guide (Windows/Linux/macOS).</p>
+  <section id="install">
+    <h2>Install with pip</h2>
+    <p class="lead">Requires Python 3.10 or newer, on Windows, Linux or macOS. Using a virtual environment is recommended.</p>
+
+    <div class="steps">
+      <div class="step">
+        <div>
+          <h3>Create a virtual environment (optional but recommended)</h3>
+          <div class="code"><pre><code>python -m venv .venv
+source .venv/bin/activate      <span class="c"># Windows: .venv\Scripts\activate</span></code></pre></div>
+        </div>
+      </div>
+      <div class="step">
+        <div>
+          <h3>Install Dragon CLI from PyPI</h3>
+          <div class="code"><pre><code>pip install dragon-cli</code></pre></div>
+          <p style="margin-top:0.6rem">To upgrade later: <code>pip install -U dragon-cli</code>.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div>
+          <h3>Install the inference engine</h3>
+          <p><code>llama-cpp-python</code> isn't a hard dependency because on many platforms PyPI only has its C++ source, so a plain install would try to compile it. This helper detects your OS and GPU and installs a prebuilt wheel (CPU, CUDA, ROCm or Metal) instead:</p>
+          <div class="code"><pre><code>dragon-cli-install-llm</code></pre></div>
+          <p style="margin-top:0.6rem">Already have a C/C++ toolchain? <code>pip install "dragon-cli[llm]"</code> builds it from source instead.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div>
+          <h3>Run it</h3>
+          <div class="code"><pre><code>dragon-cli                 <span class="c"># interactive menu</span>
+dragon-cli --auto          <span class="c"># pick the best model for this machine and start chatting</span></code></pre></div>
+          <p style="margin-top:0.6rem">Models, <code>mcp_servers.json</code> and <code>dragon_cli.db</code> are created in the folder you run it from.</p>
+        </div>
+      </div>
+    </div>
+
+    <h3>Other ways to install</h3>
+    <div class="code"><pre><code><span class="c"># latest development version straight from GitHub</span>
+pip install git+https://github.com/JPEDROPS092/dragon-cli-ai-local
+
+<span class="c"># from a local clone, editable</span>
+git clone https://github.com/JPEDROPS092/dragon-cli-ai-local
+cd dragon-cli-ai-local
+pip install -e .</code></pre></div>
   </section>
 
-  <section>
-    <h2>Use it</h2>
-    <pre><code>dragon-cli                       # model menu + interactive chat
-dragon-cli --resume 3            # resume a saved conversation
-dragon-cli --serve --port 8000   # serve the model over HTTP instead</code></pre>
+  <section id="usage">
+    <h2>Usage</h2>
+    <p class="lead">Use the interactive menu, or pass a flag to go straight to a specific action.</p>
+    <div class="two">
+      <div>
+        <h3>Chat and models</h3>
+        <div class="code"><pre><code>dragon-cli --list                <span class="c"># show the model catalog</span>
+dragon-cli --model 5             <span class="c"># chat with catalog model #5</span>
+dragon-cli --auto --priority speed
+dragon-cli --resume 3            <span class="c"># continue conversation #3</span>
+dragon-cli --no-mcp              <span class="c"># chat without tools</span></code></pre></div>
+      </div>
+      <div>
+        <h3>Hardware</h3>
+        <div class="code"><pre><code>dragon-cli --profile             <span class="c"># CPU, RAM, GPU, VRAM</span>
+dragon-cli --recommend --priority quality
+dragon-cli --gpu                 <span class="c"># offload all layers</span>
+dragon-cli --cpu                 <span class="c"># ignore the GPU</span>
+dragon-cli --ngl 20              <span class="c"># offload exactly 20 layers</span></code></pre></div>
+      </div>
+      <div>
+        <h3>HTTP server</h3>
+        <div class="code"><pre><code>dragon-cli --serve --model 5
+<span class="c"># → http://127.0.0.1:8000/v1     OpenAI API</span>
+<span class="c"># → http://127.0.0.1:8000/chat   browser chat</span>
+<span class="c"># → http://127.0.0.1:8000/docs   Swagger UI</span>
+
+dragon-cli --serve --host 0.0.0.0 --port 8080</code></pre></div>
+      </div>
+      <div>
+        <h3>History</h3>
+        <div class="code"><pre><code>dragon-cli --list-conversations
+dragon-cli --db ~/notes/ai.db    <span class="c"># separate database</span>
+
+<span class="c"># inside a chat:</span>
+/search docker
+/export 3 md</code></pre></div>
+      </div>
+    </div>
   </section>
 
-  <section>
-    <h2>In-chat commands</h2>
-    <table>
+  <section id="guides">
+    <h2>Guides: what you'll see in the terminal</h2>
+    <p class="lead">Step-by-step walkthroughs for each feature, with the output Dragon CLI prints. Paths, hardware and model names will differ on your machine.</p>
+
+    <details class="guide" open>
+      <summary><b>1. Install the inference engine</b> <small>dragon-cli-install-llm</small></summary>
+      <div class="body">
+        <p>Run this once after <code>pip install dragon-cli</code>. It detects your OS, Python version and GPU, and if a GPU is found it asks which backend to use (<code>cpu</code>, <code>cuda</code>, <code>rocm</code> or <code>mps</code>). Press Enter to keep CPU.</p>
+        <div class="term"><div class="bar"><i></i><i></i><i></i><span>terminal</span></div><pre><span class="p">$</span> dragon-cli-install-llm
+[dragon-cli] Detected Linux (x86_64), Python 3.12.7
+
+[dragon-cli] Detected NVIDIA GPU via nvidia-smi: NVIDIA GeForce RTX 3060
+[dragon-cli] GPU detected. Do you want to use a GPU-enabled wheel?
+[dragon-cli] Default backend: CPU
+[dragon-cli] Available backends: cpu, cuda, rocm, mps
+[dragon-cli] Choose backend [cpu]: <span class="u">cuda</span>
+[dragon-cli] Installing llama-cpp-python from prebuilt CUDA wheels (...)...
+
+[dragon-cli] <span class="g">✓ llama-cpp-python installed successfully!</span>
+[dragon-cli] GPU backend selected (CUDA)</pre></div>
+        <p>If no prebuilt wheel exists for your platform, it prints <code>✗ Installation failed.</code> followed by the compiler to install for your OS and the fallback command.</p>
+      </div>
+    </details>
+
+    <details class="guide">
+      <summary><b>2. The interactive menu</b> <small>dragon-cli</small></summary>
+      <div class="body">
+        <p>With no flags, Dragon opens a full-screen menu showing your hardware and the model it recommends. Move with the arrow keys and press Enter, press <code>1</code>–<code>8</code> as shortcuts, <code>/</code> to type a command (<code>/chat</code>, <code>/hub</code>, <code>/serve</code>, <code>/mcp</code>, <code>/history</code>, <code>/profile</code>), <code>r</code> to refresh, or <code>q</code> to quit.</p>
+        <div class="term"><div class="bar"><i></i><i></i><i></i><span>dragon-cli</span></div><pre><span class="cy">╭──────────────────────────────────────────────────────────╮</span>
+<span class="cy">│</span>            <span class="u"> DRAGON CLI </span> <span class="d">v0.2.1</span>   <span class="g">100% local</span>              <span class="cy">│</span>
+<span class="cy">╰──────────────────────────────────────────────────────────╯</span>
+<span class="d">╭─</span> <span class="cy">System status</span> <span class="d">───────────────────────────────────────────╮</span>
+<span class="d">│</span>  System       Fedora Linux 44 x86_64                      <span class="d">│</span>
+<span class="d">│</span>  CPU          Intel Core i7-1185G7  (8 cores)             <span class="d">│</span>
+<span class="d">│</span>  RAM          13.8 GB free / 31.1 GB total                <span class="d">│</span>
+<span class="d">│</span>  GPU          <span class="d">not detected (CPU mode)</span>                     <span class="d">│</span>
+<span class="d">│</span>  Backend      <span class="cy">CPU</span>                                         <span class="d">│</span>
+<span class="d">│</span>  Recommended  Qwen2.5-1.5B-Instruct (Q4_K_M)  <span class="d">(100%)</span>      <span class="d">│</span>
+<span class="d">╰──────────────────────────────────────────────────────────╯</span>
+<span class="cy">╭─ Main menu ──────────────────────────────────────────────╮</span>
+<span class="cy">│</span>  <span class="d">1</span> <span class="cy">›</span> <span class="u">Chat with model</span>      <span class="d">Talk to a local model</span>         <span class="cy">│</span>
+<span class="cy">│</span>  <span class="d">2</span>   List models          <span class="d">Browse the catalog</span>            <span class="cy">│</span>
+<span class="cy">│</span>  <span class="d">3</span>   Auto recommendation  <span class="d">Best model for your hardware</span>  <span class="cy">│</span>
+<span class="cy">│</span>  <span class="d">4</span>   Connect to hub       <span class="d">Search Hugging Face</span>           <span class="cy">│</span>
+<span class="cy">│</span>  <span class="d">5</span>   Manage history       <span class="d">List, resume, export</span>          <span class="cy">│</span>
+<span class="cy">│</span>  <span class="d">6</span>   Serve HTTP           <span class="d">OpenAI-compatible API</span>         <span class="cy">│</span>
+<span class="cy">│</span>  <span class="d">7</span>   Manage MCP servers   <span class="d">Add, remove, test</span>             <span class="cy">│</span>
+<span class="cy">│</span>  <span class="d">8</span>   Quit                 <span class="d">Exit Dragon CLI</span>               <span class="cy">│</span>
+<span class="cy">╰──────────────────────────────────────────────────────────╯</span>
+   <span class="cy">Arrows</span> <span class="d">move</span>  <span class="cy">Enter</span> <span class="d">select</span>  <span class="cy">1-8</span> <span class="d">shortcut</span>  <span class="cy">/</span> <span class="d">commands</span>  <span class="cy">q</span> <span class="d">quit</span></pre></div>
+      </div>
+    </details>
+
+    <details class="guide">
+      <summary><b>3. Your first chat</b> <small>dragon-cli --auto</small></summary>
+      <div class="body">
+        <ol>
+          <li><code>--auto</code> picks the best model for your hardware (or use <code>--model N</code> to choose one).</li>
+          <li>The model is downloaded from Hugging Face into <code>./models</code>. This happens only once; the next run says <code>Model already saved</code>.</li>
+          <li>It's loaded with thread count, context and GPU layers tuned for your machine.</li>
+          <li>Type a message after <code>You:</code>. The answer streams in token by token, and every message is saved to <code>dragon_cli.db</code>.</li>
+        </ol>
+        <div class="term"><div class="bar"><i></i><i></i><i></i><span>terminal</span></div><pre><span class="p">$</span> dragon-cli --auto
+
+Auto-selected model based on your hardware:
+  → Qwen2.5-1.5B-Instruct (Q4_K_M) — tiny, GPU-friendly
+  <span class="d">Why: ✓ Plenty of RAM (13.8 GB available, 3 GB needed); ○ CPU-only mode</span>
+
+<span class="y">[download]</span> Downloading qwen2.5-1.5b-instruct-q4_k_m.gguf (a few GB, only happens once)...
+<span class="g">[ok]</span> Saved to models/qwen2.5-1.5b-instruct-q4_k_m.gguf
+<span class="y">[load]</span> Loading model (threads=8, ctx=8192, mode=CPU)...
+<span class="d">[mcp] No servers configured in mcp_servers.json.</span>
+
+<span class="g">=== Chat started — Qwen2.5-1.5B-Instruct (Q4_K_M) on CPU | MCP off — /help for commands, /exit to quit ===</span>
+
+<span class="y">You:</span> <span class="u">what is a GGUF file?</span>
+GGUF is a binary file format used by llama.cpp to store a model's weights,
+tokenizer and metadata in a single file, usually quantized...
+
+<span class="y">You:</span> <span class="u">/exit</span>
+Shutting down. See you next time!</pre></div>
+      </div>
+    </details>
+
+    <details class="guide">
+      <summary><b>4. Choose a model that fits your hardware</b> <small>--profile · --recommend · --list</small></summary>
+      <div class="body">
+        <p><code>--profile</code> shows what Dragon detected. <code>--recommend</code> scores every catalog model against it; add <code>--priority speed|quality|balanced|memory</code> to change the ranking. <code>--list</code> prints the numbered catalog, which you pass to <code>--model N</code>.</p>
+        <div class="term"><div class="bar"><i></i><i></i><i></i><span>terminal</span></div><pre><span class="p">$</span> dragon-cli --profile
+============================================================
+HARDWARE PROFILE
+============================================================
+CPU:
+  Model: 11th Gen Intel(R) Core(TM) i7-1185G7 @ 3.00GHz
+  Cores: 8 logical
+Memory (RAM):
+  Total: 31.06 GB
+  Available: 13.82 GB
+GPU:
+  No dedicated GPU detected (CPU-only mode)
+============================================================
+EXECUTION CAPACITY ASSESSMENT
+============================================================
+<span class="g">✓ Memory Adequate: 13.8 GB available</span>
+  → Can run models up to 14B+ (quantized)
+
+<span class="p">$</span> dragon-cli --recommend --priority balanced
+Top Recommendations:
+  1. Qwen2.5-1.5B-Instruct (Q4_K_M) — tiny, GPU-friendly
+     <span class="g">[RECOMMENDED]</span>
+     Match: <span class="g">██████████</span> 100%
+     Min RAM: 3 GB | Context: 8192
+  ...
+
+<span class="p">$</span> dragon-cli --list
+  5. Qwen2.5-7B-Instruct (Q4_K_M) — general use, great for tools  [cloud] (GPU full ~5GB)
+  6. DeepSeek-R1-Distill-Qwen-7B (Q4_K_M) — reasoning/code  [cloud] (GPU full ~5GB)
+  8. Qwen2.5-14B-Instruct (Q4_K_M) — heavy, best quality  [cloud] <span class="r">[!] RAM may be too low right now</span></pre></div>
+        <p><code>[cloud]</code> means not downloaded yet; models already on disk show <code>[downloaded]</code>.</p>
+      </div>
+    </details>
+
+    <details class="guide">
+      <summary><b>5. Add any model from Hugging Face</b> <small>menu → 4 Connect to hub</small></summary>
+      <div class="body">
+        <ol>
+          <li>Open <code>dragon-cli</code> and pick <strong>Connect to hub</strong> (or type <code>/hub</code>).</li>
+          <li>Type a catalog number to download it, <code>s</code> to search the Hub, or paste an <code>hf://</code> path.</li>
+          <li>The search accepts a free-text query, an <code>owner/repo</code> id or a full Hugging Face URL. Dragon lists the GGUF files, pre-selects a sensible quantization, estimates the RAM needed, and adds the model to your catalog.</li>
+        </ol>
+        <div class="term"><div class="bar"><i></i><i></i><i></i><span>dragon-cli → Connect to hub</span></div><pre><span class="cy">Hub action</span> <span class="d">(catalog # download, 's' search/add, 'hf://' add direct, Enter = back)</span>: <span class="u">s</span>
+<span class="cy">Search Hugging Face</span> <span class="d">(query, owner/repo, hf://, or HF URL)</span>: <span class="u">phi-3.5 mini gguf</span>
+  ...
+<span class="g">Added</span> as catalog #9: Phi-3.5-mini-instruct (Q4_K_M)
+Download this model now? [y/n] (y): <span class="u">y</span>
+<span class="y">[download]</span> Downloading Phi-3.5-mini-instruct-Q4_K_M.gguf (a few GB, only happens once)...
+<span class="g">[ok]</span> Saved to models/Phi-3.5-mini-instruct-Q4_K_M.gguf</pre></div>
+        <p>Custom models are stored in the catalog, so they show up in <code>--list</code> and can be used with <code>--model 9</code>.</p>
+      </div>
+    </details>
+
+    <details class="guide">
+      <summary><b>6. Let the model use tools (MCP)</b> <small>mcp_servers.json · /tools</small></summary>
+      <div class="body">
+        <ol>
+          <li>Add servers from the menu (<strong>Manage MCP servers</strong> → <code>add</code>) or edit <code>mcp_servers.json</code>. See <a href="#mcp">MCP tools</a> below.</li>
+          <li>Start a chat. Each server is launched and its tools are announced to the model.</li>
+          <li>Ask something that needs a tool. The model emits a tool call, Dragon runs it, shows a preview of the result, and the model answers using it. Up to five tool calls can chain in one turn.</li>
+        </ol>
+        <div class="term"><div class="bar"><i></i><i></i><i></i><span>terminal</span></div><pre><span class="p">$</span> dragon-cli --model 5
+<span class="y">[load]</span> Loading model (threads=8, ctx=8192, mode=CPU)...
+<span class="g">[mcp]</span> 'filesystem' connected (11 tools)
+<span class="g">[mcp]</span> 'time' connected (2 tools)
+
+<span class="g">=== Chat started — Qwen2.5-7B-Instruct (Q4_K_M) on CPU | 13 MCP tools — /help for commands, /exit to quit ===</span>
+
+<span class="y">You:</span> <span class="u">which python files are in this folder?</span>
+<span class="d">[tool] running filesystem.list_directory({'path': '.'})</span>
+<span class="d">[tool] result: [FILE] dragon_cli.py\n[FILE] pyproject.toml\n[DIR] src ...</span>
+There is one Python file at the top level, dragon_cli.py. The package code
+lives in the src/ folder.</pre></div>
+        <p>A server that fails to start prints <code><span style="color:#ef6b73">[mcp]</span> Failed to connect 'name': ...</code> and the chat continues without it. Use <code>/mcp</code> to see what's connected and <code>/tools</code> to list tool names.</p>
+      </div>
+    </details>
+
+    <details class="guide">
+      <summary><b>7. Find, resume and export conversations</b> <small>/list · /search · /resume · /export</small></summary>
+      <div class="body">
+        <p>Conversations live in <code>dragon_cli.db</code> in the current folder. Manage them inside a chat with slash commands, from the menu (<strong>Manage history</strong>), or with <code>--list-conversations</code> and <code>--resume ID</code>.</p>
+        <div class="term"><div class="bar"><i></i><i></i><i></i><span>chat</span></div><pre><span class="y">You:</span> <span class="u">/list</span>
+  #3 *  GGUF questions  (6 msgs, updated 2026-10-22 10:14:03)
+  #2  Docker compose help  (14 msgs, updated 2026-10-21 18:40:51)
+  #1  First chat  (2 msgs, updated 2026-10-20 09:02:17)
+
+<span class="y">You:</span> <span class="u">/search compose</span>
+  #2 Docker compose help [user]: how do I add a healthcheck to my compose file...
+
+<span class="y">You:</span> <span class="u">/rename 2 Docker healthchecks</span>
+<span class="g">[ok]</span> Renamed #2 to 'Docker healthchecks'.
+
+<span class="y">You:</span> <span class="u">/export 2 md</span>
+<span class="g">[ok]</span> Exported to /home/you/project/conversation_2.md
+
+<span class="y">You:</span> <span class="u">/resume 2</span>
+<span class="g">[ok]</span> Resumed conversation #2.</pre></div>
+        <p><code>*</code> marks the active conversation. <code>/delete</code> asks for confirmation before removing anything.</p>
+      </div>
+    </details>
+
+    <details class="guide">
+      <summary><b>8. Serve the model to other apps</b> <small>dragon-cli --serve</small></summary>
+      <div class="body">
+        <p>Instead of chatting, load a model and expose it over HTTP. Open the printed <code>/chat</code> URL for a browser chat, or connect an <a href="#agents">agent framework</a>. Stop with Ctrl+C.</p>
+        <div class="term"><div class="bar"><i></i><i></i><i></i><span>terminal</span></div><pre><span class="p">$</span> dragon-cli --serve --model 5 --port 8000
+<span class="g">[ok]</span> Model already saved at models/qwen2.5-7b-instruct-q4_k_m.gguf
+<span class="y">[load]</span> Loading model (threads=8, ctx=8192, mode=CPU)...
+<span class="g">[serve]</span> OpenAI-compatible endpoint at <span class="cy">http://127.0.0.1:8000/v1</span>
+<span class="g">[serve]</span> Interactive docs (Swagger UI): <span class="cy">http://127.0.0.1:8000/docs</span>
+<span class="g">[serve]</span> Chat UI: <span class="cy">http://127.0.0.1:8000/chat</span>
+<span class="y">[serve]</span> Model: Qwen2.5-7B-Instruct (Q4_K_M) on CPU. Press Ctrl+C to stop.</pre></div>
+        <p>Requests are processed one at a time (llama.cpp isn't thread-safe), so concurrent calls wait in line.</p>
+      </div>
+    </details>
+
+    <details class="guide">
+      <summary><b>9. Tune GPU offload</b> <small>--gpu · --cpu · --ngl</small></summary>
+      <div class="body">
+        <p>By default Dragon decides how many layers fit in your VRAM. If loading runs out of memory, it retries with fewer GPU layers and finally falls back to CPU instead of crashing.</p>
+        <div class="term"><div class="bar"><i></i><i></i><i></i><span>terminal</span></div><pre><span class="p">$</span> dragon-cli --model 8 --gpu
+<span class="y">[load]</span> Loading model (threads=8, ctx=8192, mode=GPU)...
+<span class="r">[gpu]</span> Offloading 48 layers failed (likely out of VRAM). Retrying with fewer layers...
+<span class="y">[gpu]</span> Running with 32/48 layers on GPU (partial offload).
+
+<span class="p">$</span> dragon-cli --model 8 --ngl 20    <span class="d"># exactly 20 layers on the GPU</span>
+<span class="p">$</span> dragon-cli --model 8 --cpu       <span class="d"># ignore the GPU entirely</span></pre></div>
+        <p>If you installed the CPU wheel, every GPU option ends with <code>[gpu] GPU offload unavailable; running on CPU.</code> Run <code>dragon-cli-install-llm</code> again and pick a GPU backend.</p>
+      </div>
+    </details>
+  </section>
+
+  <section id="agents">
+    <h2>Use it with agent frameworks</h2>
+    <p class="lead">Start the server with <code>dragon-cli --serve</code>, then point any client that speaks the OpenAI API at <code>http://127.0.0.1:8000/v1</code>. The API key can be any non-empty string, and the model name is ignored because the server hosts a single model.</p>
+
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" aria-selected="true" data-tab="openai">OpenAI SDK</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="agents-sdk">OpenAI Agents SDK</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="langchain">LangChain</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="llamaindex">LlamaIndex</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="crewai">CrewAI</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="node">Node.js</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="continue">Continue</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="aider">Aider</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="openwebui">Open WebUI</button>
+      <button class="tab" role="tab" aria-selected="false" data-tab="curl">curl</button>
+    </div>
+
+    <div class="panel active" id="p-openai">
+      <p><code>pip install openai</code></p>
+      <div class="code"><pre><code>from openai import OpenAI
+
+client = OpenAI(base_url="http://127.0.0.1:8000/v1", api_key="dragon")
+
+stream = client.chat.completions.create(
+    model="local",
+    messages=[{"role": "user", "content": "Explain GGUF in one paragraph."}],
+    stream=True,
+)
+for chunk in stream:
+    print(chunk.choices[0].delta.content or "", end="", flush=True)</code></pre></div>
+    </div>
+
+    <div class="panel" id="p-agents-sdk">
+      <p><code>pip install openai-agents</code>. Tracing is turned off so the SDK doesn't look for an OpenAI key.</p>
+      <div class="code"><pre><code>from openai import AsyncOpenAI
+from agents import Agent, OpenAIChatCompletionsModel, Runner, set_tracing_disabled
+
+set_tracing_disabled(True)
+client = AsyncOpenAI(base_url="http://127.0.0.1:8000/v1", api_key="dragon")
+
+agent = Agent(
+    name="Assistant",
+    instructions="You are a concise technical assistant.",
+    model=OpenAIChatCompletionsModel(model="local", openai_client=client),
+)
+
+result = Runner.run_sync(agent, "Write a haiku about local inference.")
+print(result.final_output)</code></pre></div>
+    </div>
+
+    <div class="panel" id="p-langchain">
+      <p><code>pip install langchain-openai</code></p>
+      <div class="code"><pre><code>from langchain_openai import ChatOpenAI
+
+llm = ChatOpenAI(
+    base_url="http://127.0.0.1:8000/v1",
+    api_key="dragon",
+    model="local",
+    temperature=0.7,
+)
+print(llm.invoke("Give me three names for a dragon.").content)</code></pre></div>
+    </div>
+
+    <div class="panel" id="p-llamaindex">
+      <p><code>pip install llama-index-llms-openai-like</code></p>
+      <div class="code"><pre><code>from llama_index.llms.openai_like import OpenAILike
+
+llm = OpenAILike(
+    model="local",
+    api_base="http://127.0.0.1:8000/v1",
+    api_key="dragon",
+    is_chat_model=True,
+)
+print(llm.complete("What is retrieval-augmented generation?"))</code></pre></div>
+    </div>
+
+    <div class="panel" id="p-crewai">
+      <p><code>pip install crewai</code>. The <code>openai/</code> prefix tells CrewAI to use the OpenAI-compatible route.</p>
+      <div class="code"><pre><code>from crewai import Agent, Crew, LLM, Task
+
+llm = LLM(model="openai/local", base_url="http://127.0.0.1:8000/v1", api_key="dragon")
+
+writer = Agent(role="Writer", goal="Write clear docs", backstory="A technical writer.", llm=llm)
+task = Task(description="Summarize what Dragon CLI does.", expected_output="One paragraph.", agent=writer)
+
+print(Crew(agents=[writer], tasks=[task]).kickoff())</code></pre></div>
+    </div>
+
+    <div class="panel" id="p-node">
+      <p><code>npm install openai</code></p>
+      <div class="code"><pre><code>import OpenAI from "openai";
+
+const client = new OpenAI({ baseURL: "http://127.0.0.1:8000/v1", apiKey: "dragon" });
+
+const res = await client.chat.completions.create({
+  model: "local",
+  messages: [{ role: "user", content: "Hello from Node!" }],
+});
+console.log(res.choices[0].message.content);</code></pre></div>
+    </div>
+
+    <div class="panel" id="p-continue">
+      <p>The Continue coding assistant for VS Code and JetBrains. Add this to <code>~/.continue/config.yaml</code>:</p>
+      <div class="code"><pre><code>models:
+  - name: Dragon (local)
+    provider: openai
+    model: local
+    apiBase: http://127.0.0.1:8000/v1
+    apiKey: dragon</code></pre></div>
+    </div>
+
+    <div class="panel" id="p-aider">
+      <p>The Aider pair-programming CLI:</p>
+      <div class="code"><pre><code>aider --model openai/local \
+      --openai-api-base http://127.0.0.1:8000/v1 \
+      --openai-api-key dragon</code></pre></div>
+    </div>
+
+    <div class="panel" id="p-openwebui">
+      <p>In Open WebUI, go to <strong>Admin Settings → Connections → OpenAI API</strong> and add a connection:</p>
+      <div class="code"><pre><code>URL:     http://host.docker.internal:8000/v1    <span class="c"># or http://127.0.0.1:8000/v1 without Docker</span>
+API key: dragon</code></pre></div>
+      <p style="margin-top:0.6rem">If Open WebUI runs in Docker, start Dragon with <code>--host 0.0.0.0</code> so the container can reach it.</p>
+    </div>
+
+    <div class="panel" id="p-curl">
+      <div class="code"><pre><code>curl http://127.0.0.1:8000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"messages": [{"role": "user", "content": "Hello!"}], "stream": true}'</code></pre></div>
+    </div>
+
+    <div class="note">
+      <strong>What the server supports.</strong> It implements <code>messages</code>, <code>temperature</code>, <code>max_tokens</code> and <code>stream</code>. It does not implement OpenAI function calling (the <code>tools</code> parameter), so agents that rely on calling your Python functions will chat normally but won't run those functions. If you need tools, use MCP inside Dragon's own chat (below). The server binds to <code>127.0.0.1</code> by default and has no authentication, so only use <code>--host 0.0.0.0</code> on networks you trust.
+    </div>
+  </section>
+
+  <section id="mcp">
+    <h2>Give the model tools with MCP</h2>
+    <p class="lead">In the interactive chat, Dragon connects to the MCP servers listed in <code>mcp_servers.json</code> and teaches the model to call their tools. The result of each call goes back to the model before it answers.</p>
+
+    <div class="two">
+      <div>
+        <h3>Add servers from the menu</h3>
+        <p style="color:var(--muted);font-size:0.92rem">Open <code>dragon-cli</code> → <strong>Manage MCP servers</strong> (or type <code>/mcp</code>), then <code>add</code>, <code>remove</code> or <code>test</code>. Built-in presets:</p>
+        <div class="table-wrap"><table>
+          <tr><th>Preset</th><th>What it gives the model</th></tr>
+          <tr><td><code>filesystem</code></td><td>Read and write files in a folder you choose</td></tr>
+          <tr><td><code>fetch</code></td><td>Fetch and read web pages</td></tr>
+          <tr><td><code>git</code></td><td>Inspect and operate on a local repository</td></tr>
+          <tr><td><code>memory</code></td><td>A persistent knowledge-graph memory</td></tr>
+          <tr><td><code>sqlite</code></td><td>Query a local SQLite database</td></tr>
+          <tr><td><code>time</code></td><td>Current time and timezone conversion</td></tr>
+        </table></div>
+      </div>
+      <div>
+        <h3>Or edit the config by hand</h3>
+        <p style="color:var(--muted);font-size:0.92rem">Same format used by Claude Desktop and other MCP clients, so any stdio server works:</p>
+        <div class="code"><pre><code>{
+  "mcpServers": {
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "."]
+    },
+    "git": {
+      "command": "uvx",
+      "args": ["mcp-server-git", "--repository", "."]
+    }
+  }
+}</code></pre></div>
+        <p style="color:var(--muted);font-size:0.88rem;margin-top:0.6rem"><code>npx</code> needs Node.js and <code>uvx</code> needs <a href="https://docs.astral.sh/uv/">uv</a>. In a chat, <code>/mcp</code> shows connection status and <code>/tools</code> lists every tool. For tool use, 7B+ instruct models (Qwen 2.5 7B is a good start) work much better than tiny ones.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="reference">
+    <h2>Reference</h2>
+
+    <h3>In-chat commands</h3>
+    <div class="table-wrap"><table>
       <tr><th>Command</th><th>Description</th></tr>
-      <tr><td><code>/help</code></td><td>show available commands</td></tr>
-      <tr><td><code>/new</code>, <code>/list</code>, <code>/resume &lt;id&gt;</code></td><td>manage conversations</td></tr>
-      <tr><td><code>/rename</code>, <code>/delete</code>, <code>/search</code>, <code>/export</code></td><td>more conversation management</td></tr>
-      <tr><td><code>/tools</code>, <code>/mcp</code></td><td>inspect connected MCP servers/tools</td></tr>
-      <tr><td><code>/exit</code></td><td>quit</td></tr>
-    </table>
+      <tr><td><code>/help</code></td><td>Show available commands</td></tr>
+      <tr><td><code>/models</code></td><td>List the model catalog</td></tr>
+      <tr><td><code>/tools</code></td><td>List connected MCP tools</td></tr>
+      <tr><td><code>/mcp</code></td><td>Show MCP server connection status</td></tr>
+      <tr><td><code>/clear</code></td><td>Clear the current in-memory history</td></tr>
+      <tr><td><code>/new [title]</code></td><td>Start a new conversation</td></tr>
+      <tr><td><code>/list</code></td><td>List saved conversations</td></tr>
+      <tr><td><code>/resume &lt;id&gt;</code></td><td>Resume a saved conversation</td></tr>
+      <tr><td><code>/rename &lt;id&gt; &lt;title&gt;</code></td><td>Rename a conversation</td></tr>
+      <tr><td><code>/delete &lt;id&gt;</code></td><td>Delete a conversation</td></tr>
+      <tr><td><code>/search &lt;text&gt;</code></td><td>Search saved messages</td></tr>
+      <tr><td><code>/export &lt;id&gt; [md|json]</code></td><td>Export a conversation to a file</td></tr>
+      <tr><td><code>/exit</code>, <code>/quit</code></td><td>Quit</td></tr>
+    </table></div>
+
+    <h3>HTTP endpoints (<code>--serve</code>)</h3>
+    <div class="table-wrap"><table>
+      <tr><th>Endpoint</th><th>Description</th></tr>
+      <tr><td><code>POST /v1/chat/completions</code></td><td>OpenAI-style chat completion, streaming (SSE) or not</td></tr>
+      <tr><td><code>GET /v1/models</code></td><td>The loaded model</td></tr>
+      <tr><td><code>GET /chat</code></td><td>Browser chat UI</td></tr>
+      <tr><td><code>GET /docs</code>, <code>/redoc</code></td><td>Interactive API docs</td></tr>
+      <tr><td><code>GET /openapi.json</code></td><td>OpenAPI schema</td></tr>
+    </table></div>
+
+    <h3>All CLI flags</h3>
+    <div class="table-wrap"><table>
+      <tr><th>Flag</th><th>Description</th></tr>
+      <tr><td><code>--list</code></td><td>List the model catalog and exit</td></tr>
+      <tr><td><code>--model N</code></td><td>Use catalog model number N</td></tr>
+      <tr><td><code>--auto</code></td><td>Pick the best model for your hardware</td></tr>
+      <tr><td><code>--priority</code></td><td><code>speed</code>, <code>quality</code>, <code>balanced</code> (default) or <code>memory</code></td></tr>
+      <tr><td><code>--recommend</code></td><td>Show recommendations and exit</td></tr>
+      <tr><td><code>--profile</code></td><td>Show the hardware profile and exit</td></tr>
+      <tr><td><code>--gpu</code> / <code>--cpu</code></td><td>Force full GPU offload, or CPU only</td></tr>
+      <tr><td><code>--n-gpu-layers N</code>, <code>--ngl N</code></td><td>Layers to offload (-1 auto, 0 CPU)</td></tr>
+      <tr><td><code>--no-mcp</code></td><td>Don't connect to MCP servers</td></tr>
+      <tr><td><code>--resume ID</code></td><td>Resume a saved conversation</td></tr>
+      <tr><td><code>--list-conversations</code></td><td>List saved conversations and exit</td></tr>
+      <tr><td><code>--db PATH</code></td><td>Use a different SQLite database</td></tr>
+      <tr><td><code>--serve</code></td><td>Serve the model over HTTP instead of chatting</td></tr>
+      <tr><td><code>--host</code>, <code>--port</code></td><td>Bind address (default <code>127.0.0.1</code>) and port (default <code>8000</code>)</td></tr>
+    </table></div>
   </section>
 
   <footer>
-    MIT licensed. Built by <a href="https://github.com/JPEDROPS092">JPEDROPS092</a>.
+    MIT licensed. Built by <a href="https://github.com/JPEDROPS092">JPEDROPS092</a> ·
+    <a href="https://pypi.org/project/dragon-cli/">PyPI</a> ·
+    <a href="https://github.com/JPEDROPS092/dragon-cli-ai-local/issues">Report an issue</a>
   </footer>
 </main>
+
+<script>
+  document.querySelectorAll(".tab").forEach(tab => {
+    tab.addEventListener("click", () => {
+      document.querySelectorAll(".tab").forEach(t => t.setAttribute("aria-selected", "false"));
+      document.querySelectorAll(".panel").forEach(p => p.classList.remove("active"));
+      tab.setAttribute("aria-selected", "true");
+      document.getElementById("p-" + tab.dataset.tab).classList.add("active");
+    });
+  });
+
+  document.querySelectorAll(".code").forEach(block => {
+    const btn = document.createElement("button");
+    btn.className = "copy";
+    btn.textContent = "Copy";
+    btn.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(block.querySelector("pre").innerText);
+        btn.textContent = "Copied";
+      } catch (e) {
+        btn.textContent = "Failed";
+      }
+      setTimeout(() => (btn.textContent = "Copy"), 1500);
+    });
+    block.appendChild(btn);
+  });
+</script>
 </body>
 </html>

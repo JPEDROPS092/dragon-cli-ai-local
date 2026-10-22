@@ -1,6 +1,7 @@
 # Dependencies
 .venv/
 venv/
+.venv-release/
 __pycache__/
 *.pyc
 *.pyo
