@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Dragon CLI — local LLMs, MCP tools, OpenAI-compatible server</title>
 <meta name="description" content="Run GGUF LLMs on your own machine (CPU or GPU), give them MCP tools, keep every conversation in SQLite, and plug them into any OpenAI-compatible agent framework. pip install dragon-cli.">
-<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ctext x='32' y='50' font-size='52' text-anchor='middle'%3E%F0%9F%90%89%3C/text%3E%3C/svg%3E">
+<link rel="icon" type="image/png" href="assets/dragon-cli-mascot.png">
 <style>
   :root {
     color-scheme: dark;
@@ -28,7 +28,8 @@
     backdrop-filter: blur(8px); border-bottom: 1px solid var(--line-2);
   }
   nav .inner { max-width: 1000px; margin: 0 auto; padding: 0.6rem 16px; display: flex; gap: 1.1rem; align-items: center; overflow-x: auto; white-space: nowrap; }
-  nav .brand { font-weight: 700; color: var(--strong); text-decoration: none; margin-right: auto; }
+  nav .brand { font-weight: 700; color: var(--strong); text-decoration: none; margin-right: auto; display: inline-flex; align-items: center; gap: 0.45rem; }
+  nav .brand img { border-radius: 6px; object-fit: cover; }
   nav a.l { color: var(--muted); text-decoration: none; font-size: 0.88rem; }
   nav a.l:hover { color: var(--accent-2); }
 
@@ -52,10 +53,14 @@
   .lead { color: var(--muted); margin: 0 0 1.5rem; max-width: 720px; }
   h3 { font-size: 1rem; color: var(--strong); margin: 1.75rem 0 0.5rem; }
 
-  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; }
   .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 1.1rem 1.2rem; }
-  .card .ico { font-size: 1.35rem; line-height: 1; }
-  .card h3 { margin: 0.55rem 0 0.35rem; font-size: 1rem; }
+  .card .ico {
+    width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center;
+    background: #10261d; border: 1px solid #1d4433; color: var(--accent);
+  }
+  .card .ico svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+  .card h3 { margin: 0.8rem 0 0.35rem; font-size: 1rem; }
   .card p { margin: 0; font-size: 0.9rem; color: var(--muted); }
   .card ul { margin: 0.5rem 0 0; padding-left: 1.1rem; font-size: 0.88rem; color: var(--muted); }
 
@@ -134,9 +139,21 @@
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="i-chat" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><path d="M8 9h8M8 13h5"/></symbol>
+    <symbol id="i-zap" viewBox="0 0 24 24"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></symbol>
+    <symbol id="i-gauge" viewBox="0 0 24 24"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="m7 10 5 5 5-5"/><path d="M12 15V3"/></symbol>
+    <symbol id="i-wrench" viewBox="0 0 24 24"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></symbol>
+    <symbol id="i-database" viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0 0 18 0V5"/><path d="M3 12a9 3 0 0 0 18 0"/></symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></symbol>
+    <symbol id="i-terminal" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="m7 9 3 3-3 3"/><path d="M13 15h4"/></symbol>
+  </defs>
+</svg>
 <nav>
   <div class="inner">
-    <a class="brand" href="#">🐉 Dragon CLI</a>
+    <a class="brand" href="#"><img src="assets/dragon-cli-mascot.png" alt="" width="22" height="22">Dragon CLI</a>
     <a class="l" href="#features">Features</a>
     <a class="l" href="#install">Install</a>
     <a class="l" href="#usage">Usage</a>
@@ -178,42 +195,42 @@ dragon-cli</code></pre>
     <p class="lead">One command line tool that covers the whole local-LLM loop: choosing a model that fits your hardware, downloading it, chatting with it, giving it tools, and serving it to other apps.</p>
     <div class="grid">
       <div class="card">
-        <div class="ico">💬</div>
+        <div class="ico"><svg aria-hidden="true"><use href="#i-chat"/></svg></div>
         <h3>Local streaming chat</h3>
         <p>Talk to GGUF models through llama.cpp with tokens streamed as they're generated. No cloud API key, nothing leaves your machine.</p>
       </div>
       <div class="card">
-        <div class="ico">⚡</div>
+        <div class="ico"><svg aria-hidden="true"><use href="#i-zap"/></svg></div>
         <h3>CPU or GPU, auto-tuned</h3>
         <p>Detects NVIDIA (CUDA), AMD (ROCm) and Apple Silicon (Metal). Offloads as many layers as your VRAM allows and backs off gracefully when it runs out.</p>
       </div>
       <div class="card">
-        <div class="ico">🧠</div>
+        <div class="ico"><svg aria-hidden="true"><use href="#i-gauge"/></svg></div>
         <h3>Hardware-aware recommendations</h3>
         <p>Profiles your RAM, CPU and GPU, then ranks models by <code>speed</code>, <code>quality</code>, <code>balanced</code> or <code>memory</code>. <code>--auto</code> picks for you.</p>
       </div>
       <div class="card">
-        <div class="ico">🤗</div>
+        <div class="ico"><svg aria-hidden="true"><use href="#i-download"/></svg></div>
         <h3>Hugging Face hub</h3>
         <p>A curated catalog (Qwen 2.5, Llama 3.x, DeepSeek-R1 distills and more), plus search across the Hub. Add any GGUF by repo id, URL or <code>hf://</code> path.</p>
       </div>
       <div class="card">
-        <div class="ico">🔧</div>
+        <div class="ico"><svg aria-hidden="true"><use href="#i-wrench"/></svg></div>
         <h3>MCP tool-calling</h3>
         <p>Connect Model Context Protocol servers (filesystem, git, fetch, SQLite, memory, time, or your own) and the model calls their tools mid-conversation.</p>
       </div>
       <div class="card">
-        <div class="ico">🗂️</div>
+        <div class="ico"><svg aria-hidden="true"><use href="#i-database"/></svg></div>
         <h3>Conversation history</h3>
         <p>Every message is saved to SQLite the moment it's sent. Resume, rename, search, delete, or export a conversation to Markdown or JSON.</p>
       </div>
       <div class="card">
-        <div class="ico">🌐</div>
+        <div class="ico"><svg aria-hidden="true"><use href="#i-globe"/></svg></div>
         <h3>OpenAI-compatible server</h3>
         <p><code>--serve</code> exposes <code>/v1/chat/completions</code> (with streaming) and <code>/v1/models</code>, plus Swagger docs and a browser chat UI.</p>
       </div>
       <div class="card">
-        <div class="ico">🖥️</div>
+        <div class="ico"><svg aria-hidden="true"><use href="#i-terminal"/></svg></div>
         <h3>Interactive menu</h3>
         <p>Run <code>dragon-cli</code> with no flags for a full-screen menu: arrow keys, number shortcuts, and slash commands like <code>/hub</code> or <code>/serve</code>.</p>
       </div>
